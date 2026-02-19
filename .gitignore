@@ -29,3 +29,8 @@ static/qrcodes/*.png
 # OS
 .DS_Store
 Thumbs.db
+
+# Test / Coverage
+.coverage
+htmlcov/
+.pytest_cache/

@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------------------
+# Redline – Docker Compose deployment
+#
+# Usage:
+#   cp .env.example .env   # fill in all required values
+#   docker compose up -d
+#   docker compose logs -f
+#
+# For production, swap the SQLite volume for a PostgreSQL service and
+# set DATABASE_URL accordingly.
+# ---------------------------------------------------------------------------
+
+services:
+  redline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: redline:latest
+    container_name: redline_app
+    restart: unless-stopped
+
+    ports:
+      - "${APP_PORT:-8000}:8000"
+
+    env_file:
+      - .env
+
+    environment:
+      # Override DATABASE_URL to use the named volume path
+      DATABASE_URL: "sqlite:////app/data/redline.db"
+      FLASK_ENV: "production"
+
+    volumes:
+      # SQLite database persisted across container restarts
+      - redline_data:/app/data
+      # Generated QR code PNGs
+      - redline_qrcodes:/app/static/qrcodes
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  redline_data:
+    driver: local
+  redline_qrcodes:
+    driver: local

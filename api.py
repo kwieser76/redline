@@ -23,28 +23,34 @@ GET    /api/v1/events                      List distinct events
 GET    /api/v1/events/<project_number>     Defects for one event
 """
 
-import io
 import functools
+import io
 from datetime import datetime, timezone
 
 import qrcode
-from flask import Blueprint, jsonify, request, send_file
-from werkzeug.security import check_password_hash
+from flask import Blueprint, g, jsonify, request, send_file
 
 from models import Defect, Device, User, db
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#  Helpers                                                                      #
+# --------------------------------------------------------------------------- #
+
+_WWW_AUTH = 'Basic realm="Redline API"'
+
 
 def _json_error(message: str, status: int):
-    return jsonify({"error": message}), status
+    resp = jsonify({"error": message})
+    if status == 401:
+        resp.headers["WWW-Authenticate"] = _WWW_AUTH
+    return resp, status
 
 
 def _require_auth(admin_only: bool = False):
     """Decorator factory – enforces HTTP Basic Auth."""
+
     def decorator(f):
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
@@ -56,10 +62,12 @@ def _require_auth(admin_only: bool = False):
                 return _json_error("Invalid credentials.", 401)
             if admin_only and not user.is_admin:
                 return _json_error("Admin access required.", 403)
-            # Attach user to request context for downstream use
-            request._api_user = user
+            # Make the authenticated user available in the request context.
+            g.api_user = user
             return f(*args, **kwargs)
+
         return wrapped
+
     return decorator
 
 
@@ -91,9 +99,10 @@ def _defect_to_dict(defect: Defect) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Device endpoints
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#  Device endpoints                                                             #
+# --------------------------------------------------------------------------- #
+
 
 @api_bp.route("/devices", methods=["GET"])
 @_require_auth()
@@ -140,7 +149,7 @@ def get_device(device_id: str):
 @api_bp.route("/devices/<string:device_id>", methods=["PATCH"])
 @_require_auth(admin_only=True)
 def update_device(device_id: str):
-    """Update device name, description or status. Requires admin."""
+    """Update device name, description, or status. Requires admin."""
     device = Device.query.filter_by(device_id=device_id).first()
     if not device:
         return _json_error(f"Device '{device_id}' not found.", 404)
@@ -154,7 +163,9 @@ def update_device(device_id: str):
         device.description = str(data["description"]).strip()
     if "status" in data:
         if data["status"] not in allowed_statuses:
-            return _json_error(f"'status' must be one of: {sorted(allowed_statuses)}", 400)
+            return _json_error(
+                f"'status' must be one of: {sorted(allowed_statuses)}", 400
+            )
         device.status = data["status"]
 
     db.session.commit()
@@ -164,7 +175,7 @@ def update_device(device_id: str):
 @api_bp.route("/devices/<string:device_id>", methods=["DELETE"])
 @_require_auth(admin_only=True)
 def delete_device(device_id: str):
-    """Delete a device and all its defects. Requires admin."""
+    """Delete a device and all its defects (cascade). Requires admin."""
     device = Device.query.filter_by(device_id=device_id).first()
     if not device:
         return _json_error(f"Device '{device_id}' not found.", 404)
@@ -178,6 +189,7 @@ def delete_device(device_id: str):
 def device_qr(device_id: str):
     """Return the QR-code PNG for a device. Requires admin."""
     from flask import current_app
+
     device = Device.query.filter_by(device_id=device_id).first()
     if not device:
         return _json_error(f"Device '{device_id}' not found.", 404)
@@ -187,13 +199,13 @@ def device_qr(device_id: str):
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
-    return send_file(buf, mimetype="image/png",
-                     download_name=f"qr_{device_id}.png")
+    return send_file(buf, mimetype="image/png", download_name=f"qr_{device_id}.png")
 
 
-# ---------------------------------------------------------------------------
-# Defect endpoints
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#  Defect endpoints                                                             #
+# --------------------------------------------------------------------------- #
+
 
 @api_bp.route("/defects", methods=["GET"])
 @_require_auth()
@@ -222,7 +234,15 @@ def list_defects():
         if device:
             query = query.filter_by(device_id=device.id)
         else:
-            return jsonify({"items": [], "total": 0, "page": page, "per_page": per_page, "pages": 0})
+            return jsonify(
+                {
+                    "items": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": 0,
+                }
+            )
     if event_name:
         query = query.filter(Defect.event_name.ilike(f"%{event_name}%"))
     if project_number:
@@ -231,13 +251,15 @@ def list_defects():
     pagination = query.order_by(Defect.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
-    return jsonify({
-        "items": [_defect_to_dict(d) for d in pagination.items],
-        "total": pagination.total,
-        "page": pagination.page,
-        "per_page": per_page,
-        "pages": pagination.pages,
-    })
+    return jsonify(
+        {
+            "items": [_defect_to_dict(d) for d in pagination.items],
+            "total": pagination.total,
+            "page": pagination.page,
+            "per_page": per_page,
+            "pages": pagination.pages,
+        }
+    )
 
 
 @api_bp.route("/defects", methods=["POST"])
@@ -258,7 +280,7 @@ def create_defect():
     event_name = str(data.get("event_name", "")).strip()
     project_number = str(data.get("project_number", "")).strip()
 
-    errors = {}
+    errors: dict = {}
     if not device_id:
         errors["device_id"] = "Required."
     if not category:
@@ -284,30 +306,35 @@ def create_defect():
         description=description,
         event_name=event_name,
         project_number=project_number,
-        reporter=request._api_user.username,
+        reporter=g.api_user.username,
     )
     db.session.add(defect)
     device.status = "Wartung"
     db.session.commit()
 
-    # FileMaker sync
+    # FileMaker sync (non-blocking – errors are logged, not raised)
     from filemaker import fm_client
+
     fm_client.update_device_status(device.device_id, "Wartung")
-    fm_client.create_defect_record({
-        "Geräte-ID": device.device_id,
-        "Gerätename": device.name,
-        "Kategorie": category,
-        "Beschreibung": description,
-        "Eventname": event_name,
-        "Projektnummer": project_number,
-        "Status": "Offen",
-        "Gemeldet_Von": request._api_user.username,
-    })
+    fm_client.create_defect_record(
+        {
+            "Geräte-ID": device.device_id,
+            "Gerätename": device.name,
+            "Kategorie": category,
+            "Beschreibung": description,
+            "Eventname": event_name,
+            "Projektnummer": project_number,
+            "Status": "Offen",
+            "Gemeldet_Von": g.api_user.username,
+        }
+    )
 
     # Email notification
     mail = current_app.extensions.get("mail")
     if mail:
-        send_defect_notification(mail, defect, device.name, current_app.config["WORKSHOP_EMAIL"])
+        send_defect_notification(
+            mail, defect, device.name, current_app.config["WORKSHOP_EMAIL"]
+        )
 
     return jsonify(_defect_to_dict(defect)), 201
 
@@ -342,19 +369,22 @@ def resolve_defect(defect_id: int):
     defect.resolved_at = datetime.now(timezone.utc)
 
     device = defect.device
+    # autoflush ensures the status change above is visible to this count query
     open_count = Defect.query.filter_by(device_id=device.id, status="Offen").count()
     if open_count == 0:
         device.status = "Verfügbar"
         from filemaker import fm_client
+
         fm_client.update_device_status(device.device_id, "Verfügbar")
 
     db.session.commit()
     return jsonify(_defect_to_dict(defect))
 
 
-# ---------------------------------------------------------------------------
-# Event endpoints
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#  Event endpoints                                                              #
+# --------------------------------------------------------------------------- #
+
 
 @api_bp.route("/events", methods=["GET"])
 @_require_auth()
@@ -366,10 +396,9 @@ def list_events():
         .order_by(Defect.event_name)
         .all()
     )
-    return jsonify([
-        {"event_name": r.event_name, "project_number": r.project_number}
-        for r in rows
-    ])
+    return jsonify(
+        [{"event_name": r.event_name, "project_number": r.project_number} for r in rows]
+    )
 
 
 @api_bp.route("/events/<string:project_number>", methods=["GET"])
@@ -386,9 +415,11 @@ def get_event_defects(project_number: str):
     defects = query.order_by(Defect.created_at.desc()).all()
     if not defects:
         return _json_error(f"No defects found for project '{project_number}'.", 404)
-    return jsonify({
-        "project_number": project_number,
-        "event_name": defects[0].event_name if defects else None,
-        "defect_count": len(defects),
-        "defects": [_defect_to_dict(d) for d in defects],
-    })
+    return jsonify(
+        {
+            "project_number": project_number,
+            "event_name": defects[0].event_name,
+            "defect_count": len(defects),
+            "defects": [_defect_to_dict(d) for d in defects],
+        }
+    )

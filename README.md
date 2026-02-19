@@ -1,6 +1,13 @@
 # Redline – QR-Code-basiertes Defektmeldesystem
 
-Webbasiertes Qualitätssicherungssystem für **Redline Event Engineering**. Techniker scannen einen QR-Code am Gerät, füllen das Defektmeldeformular aus und senden den vorausgefüllten Bericht direkt über ihren nativen E-Mail-Client an die konfigurierten Empfänger. Defekte werden parallel in der Datenbank protokolliert und sind über den Admin-Bereich auswertbar.
+Webbasiertes Qualitätssicherungssystem für **Redline Event Engineering**. Techniker scannen einen QR-Code am Gerät, füllen das Defektmeldeformular aus und senden den vorausgefüllten Bericht direkt über ihren nativen E-Mail-Client an die konfigurierten Empfänger. Defekte werden parallel in der lokalen Datenbank protokolliert und sind über den Admin-Bereich auswertbar. **Techniker arbeiten ausschliesslich per Smartphone (z. B. iPhone), Administratoren über den PC-Browser.**
+
+## Zugang
+
+| Rolle       | Gerät               | Einstiegspunkt                          |
+|-------------|---------------------|-----------------------------------------|
+| Techniker   | Smartphone / iPhone | QR-Code scannen → `/report/<geräte-id>` |
+| Admin       | PC-Browser          | `/admin/`                               |
 
 ---
 
@@ -39,7 +46,7 @@ Webbasiertes Qualitätssicherungssystem für **Redline Event Engineering**. Tech
 5. E-Mail-Client öffnet automatisch mit vorausgefülltem Bericht
 6. Techniker schickt E-Mail ab  →  Empfänger erhalten die Meldung
 7. Werkstatt repariert das Gerät
-8. Admin markiert Defekt als behoben  →  Gerät → „Verfügbar"
+8. Admin markiert Defekt als behoben  →  Gerät → „Verfügbar" (nur im System)
 9. Optional: Admin sendet Ereignisbericht nach dem Event
 ```
 
@@ -90,7 +97,7 @@ Alle Einstellungen werden über eine `.env`-Datei gesteuert:
 |-----------------------|------------------------------------------------------------------------------|---------------------------|
 | `SECRET_KEY`          | Flask Session Secret (in Produktion ändern!)                                 | `change-me-…`             |
 | `DATABASE_URL`        | Datenbankverbindung                                                          | SQLite `redline.db`       |
-| `APP_BASE_URL`        | Öffentliche URL der Anwendung (Basis für QR-Links)                           | `http://localhost:5000`   |
+| `APP_BASE_URL`        | Öffentliche URL der Anwendung (Basis für QR-Links) – **muss in Produktion gesetzt werden, sonst sind alle QR-Codes unbrauchbar** | `http://localhost:5000`   |
 | `WORKSHOP_EMAIL`      | Initiale Empfänger-Adresse – wird beim ersten Start automatisch angelegt     | `werkstatt@redline.local` |
 | `MAIL_SERVER`         | SMTP-Server – **nur für Ereignisberichte** benötigt                          | `smtp.gmail.com`          |
 | `MAIL_PORT`           | SMTP-Port                                                                    | `587`                     |
