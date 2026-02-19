@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Defekthistorie – {{ device.name }}{% endblock %}
+
+{% block content %}
+<div class="device-badge">
+  <div>
+    <div class="device-id">Geräte-ID: {{ device.device_id }}</div>
+    <div class="device-name">{{ device.name }}</div>
+  </div>
+  <span class="badge {% if device.status == 'Verfügbar' %}badge-available{% else %}badge-maintenance{% endif %}">
+    {{ device.status }}
+  </span>
+</div>
+
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Defekthistorie</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('admin.qr_page', device_id=device.device_id) }}" class="btn btn-sm btn-outline">QR-Code</a>
+  <a href="{{ url_for('admin.devices') }}" class="btn btn-sm btn-secondary">Alle Geräte</a>
+</div>
+
+{% if pagination.items %}
+<div class="card" style="padding:0;overflow:hidden;">
+  {% for defect in pagination.items %}
+  <div style="padding:18px 20px; {% if not loop.last %}border-bottom:1px solid var(--gray-100);{% endif %}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+      <div>
+        <strong style="font-size:16px;">{{ defect.category }}</strong>
+        <span class="badge {% if defect.status == 'Offen' %}badge-open{% else %}badge-resolved{% endif %}" style="margin-left:8px;">
+          {{ defect.status }}
+        </span>
+      </div>
+      <div style="font-size:13px;color:var(--gray-600);">
+        {{ defect.created_at.strftime('%d.%m.%Y %H:%M') }}
+      </div>
+    </div>
+
+    <p style="margin:8px 0 4px;font-size:15px;">{{ defect.description }}</p>
+
+    <div style="font-size:13px;color:var(--gray-600);">
+      Event: <strong>{{ defect.event_name }}</strong> &middot;
+      Projekt: <strong>{{ defect.project_number }}</strong> &middot;
+      Gemeldet von: {{ defect.reporter }}
+    </div>
+
+    {% if defect.status == 'Behoben' and defect.resolved_at %}
+    <div style="font-size:13px;color:var(--green);margin-top:6px;">
+      Behoben am {{ defect.resolved_at.strftime('%d.%m.%Y %H:%M') }}
+      {% if defect.resolution_notes %} &mdash; {{ defect.resolution_notes }}{% endif %}
+    </div>
+    {% endif %}
+
+    {% if defect.status == 'Offen' %}
+    <form method="POST" action="{{ url_for('admin.mark_repaired', defect_id=defect.id) }}" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <input type="text" name="resolution_notes" placeholder="Behebungsnotiz (optional)" style="flex:1;min-width:180px;font-size:14px;padding:10px 14px;" maxlength="500" />
+      <button type="submit" class="btn btn-sm btn-success"
+        data-confirm="Defekt als behoben markieren?">
+        Als behoben markieren
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}
+  <a href="{{ url_for('admin.device_history', device_id=device.device_id, page=pagination.prev_num) }}" class="page-link">&laquo;</a>
+  {% else %}
+  <span class="page-link disabled">&laquo;</span>
+  {% endif %}
+
+  {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+    {% if p %}
+    <a href="{{ url_for('admin.device_history', device_id=device.device_id, page=p) }}"
+       class="page-link {% if p == pagination.page %}active{% endif %}">{{ p }}</a>
+    {% else %}
+    <span class="page-link disabled">…</span>
+    {% endif %}
+  {% endfor %}
+
+  {% if pagination.has_next %}
+  <a href="{{ url_for('admin.device_history', device_id=device.device_id, page=pagination.next_num) }}" class="page-link">&raquo;</a>
+  {% else %}
+  <span class="page-link disabled">&raquo;</span>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="text-align:center;color:var(--gray-600);padding:40px;">
+  Keine Defekte für dieses Gerät gemeldet.
+</div>
+{% endif %}
+{% endblock %}
