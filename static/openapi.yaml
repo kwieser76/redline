@@ -1,0 +1,639 @@
+openapi: 3.0.3
+
+info:
+  title: Redline Defektmeldesystem API
+  description: |
+    REST JSON API für das QR-Code-basierte Defektmeldesystem von Redline Enterprise.
+
+    ## Authentifizierung
+    Alle Endpunkte verwenden **HTTP Basic Auth** mit denselben Zugangsdaten wie die Web-Oberfläche.
+
+    | Benutzer      | Rolle       | Bemerkung                        |
+    |---------------|-------------|----------------------------------|
+    | `admin`       | Admin       | Vollzugriff                      |
+    | `team_login`  | Standard    | Defekte melden, Daten lesen      |
+
+    ## Statuscodes
+    | Code | Bedeutung                   |
+    |------|-----------------------------|
+    | 200  | OK                          |
+    | 201  | Erstellt                    |
+    | 204  | Gelöscht (kein Body)        |
+    | 400  | Validierungsfehler          |
+    | 401  | Nicht authentifiziert       |
+    | 403  | Keine Berechtigung (Admin)  |
+    | 404  | Nicht gefunden              |
+    | 409  | Konflikt (z.B. ID vergeben) |
+
+  version: "1.0.0"
+  contact:
+    name: Redline Enterprise
+    email: admin@redline.local
+
+servers:
+  - url: /api/v1
+    description: Lokaler Server
+
+security:
+  - basicAuth: []
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+
+  schemas:
+    Device:
+      type: object
+      properties:
+        device_id:
+          type: string
+          example: CAM-001
+        name:
+          type: string
+          example: Kamera Sony A7 IV
+        description:
+          type: string
+          example: Vollformatkamera, Body + 24-70mm
+        status:
+          type: string
+          enum: [Verfügbar, Wartung]
+          example: Verfügbar
+        open_defect_count:
+          type: integer
+          example: 0
+        created_at:
+          type: string
+          format: date-time
+
+    DeviceCreate:
+      type: object
+      required: [device_id, name]
+      properties:
+        device_id:
+          type: string
+          example: CAM-001
+        name:
+          type: string
+          example: Kamera Sony A7 IV
+        description:
+          type: string
+          example: Vollformatkamera, Body + 24-70mm
+
+    DeviceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [Verfügbar, Wartung]
+
+    Defect:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        device_id:
+          type: string
+          example: CAM-001
+        device_name:
+          type: string
+          example: Kamera Sony A7 IV
+        category:
+          type: string
+          example: Gehäuseschaden
+        description:
+          type: string
+          example: Linker Griff gebrochen, Kamera funktioniert noch.
+        event_name:
+          type: string
+          example: Sommerfestival 2025
+        project_number:
+          type: string
+          example: PRJ-2025-042
+        status:
+          type: string
+          enum: [Offen, Behoben]
+        reporter:
+          type: string
+          example: team_login
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        resolution_notes:
+          type: string
+          nullable: true
+
+    DefectCreate:
+      type: object
+      required: [device_id, category, description, event_name, project_number]
+      properties:
+        device_id:
+          type: string
+          example: CAM-001
+        category:
+          type: string
+          enum:
+            - Mechanischer Schaden
+            - Elektrischer Fehler
+            - Softwareproblem
+            - Gehäuseschaden
+            - Kabelproblem
+            - Displayschaden
+            - Akkuproblem
+            - Wasserschaden
+            - Sonstiges
+          example: Gehäuseschaden
+        description:
+          type: string
+          example: Linker Griff gebrochen, Kamera funktioniert noch.
+          maxLength: 2000
+        event_name:
+          type: string
+          example: Sommerfestival 2025
+          maxLength: 120
+        project_number:
+          type: string
+          example: PRJ-2025-042
+          maxLength: 50
+
+    DefectResolve:
+      type: object
+      properties:
+        resolution_notes:
+          type: string
+          example: Griff ersetzt, getestet – OK.
+
+    DefectListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Defect"
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        pages:
+          type: integer
+
+    EventDefectsResponse:
+      type: object
+      properties:
+        project_number:
+          type: string
+        event_name:
+          type: string
+        defect_count:
+          type: integer
+        defects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Defect"
+
+    EventSummary:
+      type: object
+      properties:
+        event_name:
+          type: string
+        project_number:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+
+paths:
+
+  # ---- Devices ----
+
+  /devices:
+    get:
+      summary: Alle Geräte auflisten
+      operationId: listDevices
+      tags: [Geräte]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Verfügbar, Wartung]
+          description: Geräte nach Status filtern
+      responses:
+        "200":
+          description: Liste aller Geräte
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Device"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      summary: Neues Gerät anlegen
+      operationId: createDevice
+      tags: [Geräte]
+      security:
+        - basicAuth: []   # admin only (enforced in code)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceCreate"
+            example:
+              device_id: CAM-001
+              name: Kamera Sony A7 IV
+              description: Vollformatkamera mit 24-70mm
+      responses:
+        "201":
+          description: Gerät erstellt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /devices/{device_id}:
+    parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: CAM-001
+
+    get:
+      summary: Einzelnes Gerät abrufen
+      operationId: getDevice
+      tags: [Geräte]
+      responses:
+        "200":
+          description: Gerät gefunden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      summary: Gerät aktualisieren
+      operationId: updateDevice
+      tags: [Geräte]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceUpdate"
+      responses:
+        "200":
+          description: Gerät aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      summary: Gerät löschen
+      operationId: deleteDevice
+      tags: [Geräte]
+      responses:
+        "204":
+          description: Gerät gelöscht
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /devices/{device_id}/qr:
+    parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: CAM-001
+    get:
+      summary: QR-Code PNG herunterladen
+      operationId: getDeviceQr
+      tags: [Geräte]
+      responses:
+        "200":
+          description: PNG-Bild des QR-Codes
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---- Defects ----
+
+  /defects:
+    get:
+      summary: Defekte auflisten
+      operationId: listDefects
+      tags: [Defekte]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Offen, Behoben]
+        - name: device_id
+          in: query
+          schema:
+            type: string
+          description: Filtert nach Geräte-ID
+        - name: event_name
+          in: query
+          schema:
+            type: string
+          description: Teilstring-Suche im Eventnamen
+        - name: project_number
+          in: query
+          schema:
+            type: string
+          description: Teilstring-Suche in der Projektnummer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        "200":
+          description: Paginierte Defektliste
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DefectListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      summary: Neuen Defekt melden
+      operationId: createDefect
+      tags: [Defekte]
+      description: |
+        Meldet einen Defekt für ein Gerät.
+        - Setzt Gerätestatus auf **Wartung**
+        - Synchronisiert mit FileMaker
+        - Sendet E-Mail-Benachrichtigung an die Werkstatt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DefectCreate"
+            example:
+              device_id: CAM-001
+              category: Gehäuseschaden
+              description: Linker Griff gebrochen
+              event_name: Sommerfestival 2025
+              project_number: PRJ-2025-042
+      responses:
+        "201":
+          description: Defekt gemeldet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Defect"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /defects/{defect_id}:
+    parameters:
+      - name: defect_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        example: 42
+    get:
+      summary: Einzelnen Defekt abrufen
+      operationId: getDefect
+      tags: [Defekte]
+      responses:
+        "200":
+          description: Defekt gefunden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Defect"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /defects/{defect_id}/resolve:
+    parameters:
+      - name: defect_id
+        in: path
+        required: true
+        schema:
+          type: integer
+        example: 42
+    patch:
+      summary: Defekt als behoben markieren
+      operationId: resolveDefect
+      tags: [Defekte]
+      description: |
+        Setzt den Defektstatus auf **Behoben**.
+        Wenn keine offenen Defekte für das Gerät mehr vorhanden sind,
+        wird der Gerätestatus automatisch auf **Verfügbar** zurückgesetzt.
+        Erfordert Admin-Rechte.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DefectResolve"
+            example:
+              resolution_notes: Griff ersetzt und getestet.
+      responses:
+        "200":
+          description: Defekt behoben
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Defect"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  # ---- Events ----
+
+  /events:
+    get:
+      summary: Alle Events auflisten
+      operationId: listEvents
+      tags: [Events]
+      description: Gibt alle eindeutigen (Eventname, Projektnummer)-Kombinationen zurück.
+      responses:
+        "200":
+          description: Liste der Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /events/{project_number}:
+    parameters:
+      - name: project_number
+        in: path
+        required: true
+        schema:
+          type: string
+        example: PRJ-2025-042
+      - name: event_name
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Weiter einschränken nach Eventname
+    get:
+      summary: Defekte eines Events abrufen
+      operationId: getEventDefects
+      tags: [Events]
+      responses:
+        "200":
+          description: Alle Defekte für das Event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDefectsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+# ---------------------------------------------------------------------------
+# Shared responses
+# ---------------------------------------------------------------------------
+
+components:
+  responses:
+    Unauthorized:
+      description: Authentifizierung erforderlich
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Authentication required.
+
+    Forbidden:
+      description: Keine Admin-Berechtigung
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Admin access required.
+
+    NotFound:
+      description: Ressource nicht gefunden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Device 'CAM-999' not found.
+
+    BadRequest:
+      description: Validierungsfehler
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Validation failed.
+            fields:
+              category: Required.
+
+    Conflict:
+      description: Konflikt (z.B. ID bereits vorhanden)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: device_id 'CAM-001' already exists.
+
+tags:
+  - name: Geräte
+    description: Geräteverwaltung
+  - name: Defekte
+    description: Defektmeldung und -verwaltung
+  - name: Events
+    description: Event-basierte Auswertung

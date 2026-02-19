@@ -21,6 +21,7 @@
     <nav class="navbar-nav">
       {% if current_user.is_admin %}
       <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.') %}active{% endif %}">Admin</a>
+      <a href="{{ url_for('api_docs') }}" class="nav-link {% if request.endpoint == 'api_docs' %}active{% endif %}">API</a>
       {% endif %}
       <span class="nav-user">{{ current_user.username }}</span>
       <a href="{{ url_for('auth.logout') }}" class="nav-link nav-logout">Abmelden</a>

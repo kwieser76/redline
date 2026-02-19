@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redline API – Dokumentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; background: #f2f2f7; font-family: -apple-system, sans-serif; }
+    .topbar { background: #cc0000 !important; }
+    .topbar-wrapper img { display: none; }
+    .topbar-wrapper::before {
+      content: "● Redline API";
+      color: #fff;
+      font-size: 20px;
+      font-weight: 700;
+      padding: 0 16px;
+    }
+    .swagger-ui .info .title { color: #cc0000; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: "/static/openapi.yaml",
+      dom_id: "#swagger-ui",
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: "BaseLayout",
+      deepLinking: true,
+      displayRequestDuration: true,
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 2,
+    });
+  </script>
+</body>
+</html>

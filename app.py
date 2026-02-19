@@ -411,9 +411,16 @@ def create_app(config_class=Config) -> Flask:
         return render_template("admin/event_report.html", events=events)
 
     # ---- Register blueprints ----
+    from api import api_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(report_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(api_bp)
+
+    # ---- API docs route (Swagger UI) ----
+    @app.route("/api/docs")
+    def api_docs():
+        return render_template("api_docs.html")
 
     # ---- Root route ----
     @app.route("/")
