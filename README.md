@@ -118,6 +118,72 @@ Alle Einstellungen werden über eine `.env`-Datei gesteuert (siehe `.env.example
 
 ---
 
+## REST JSON API
+
+Die Anwendung stellt eine vollständige REST API unter `/api/v1/` bereit.
+
+### Interaktive Dokumentation (Swagger UI)
+
+```
+http://localhost:5000/api/docs
+```
+
+Die Swagger UI zeigt alle Endpunkte, Schemata und erlaubt direktes Ausprobieren im Browser.
+
+### Authentifizierung
+
+HTTP Basic Auth – dieselben Zugangsdaten wie die Web-Oberfläche.
+
+```bash
+curl -u team_login:team2025 http://localhost:5000/api/v1/devices
+```
+
+### Endpunktübersicht
+
+| Methode  | Pfad                              | Beschreibung                        | Admin? |
+|----------|-----------------------------------|-------------------------------------|--------|
+| `GET`    | `/api/v1/devices`                 | Alle Geräte (Filter: `?status=`)   | –      |
+| `POST`   | `/api/v1/devices`                 | Gerät anlegen                       | ✓      |
+| `GET`    | `/api/v1/devices/{id}`            | Einzelnes Gerät                     | –      |
+| `PATCH`  | `/api/v1/devices/{id}`            | Gerät aktualisieren                 | ✓      |
+| `DELETE` | `/api/v1/devices/{id}`            | Gerät löschen                       | ✓      |
+| `GET`    | `/api/v1/devices/{id}/qr`         | QR-Code PNG herunterladen           | ✓      |
+| `GET`    | `/api/v1/defects`                 | Defekte (Filter: status, event, …)  | –      |
+| `POST`   | `/api/v1/defects`                 | Defekt melden                       | –      |
+| `GET`    | `/api/v1/defects/{id}`            | Einzelner Defekt                    | –      |
+| `PATCH`  | `/api/v1/defects/{id}/resolve`    | Defekt als behoben markieren        | ✓      |
+| `GET`    | `/api/v1/events`                  | Alle Events auflisten               | –      |
+| `GET`    | `/api/v1/events/{project_number}` | Defekte eines Events                | –      |
+
+### Beispiele
+
+**Defekt melden:**
+```bash
+curl -u team_login:team2025 -X POST http://localhost:5000/api/v1/defects \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "CAM-001",
+    "category": "Gehäuseschaden",
+    "description": "Linker Griff gebrochen",
+    "event_name": "Sommerfestival 2025",
+    "project_number": "PRJ-2025-042"
+  }'
+```
+
+**Defekte eines Events abrufen:**
+```bash
+curl -u admin:admin123 http://localhost:5000/api/v1/events/PRJ-2025-042
+```
+
+**Defekt als behoben markieren:**
+```bash
+curl -u admin:admin123 -X PATCH http://localhost:5000/api/v1/defects/42/resolve \
+  -H "Content-Type: application/json" \
+  -d '{"resolution_notes": "Griff ersetzt und getestet."}'
+```
+
+---
+
 ## FileMaker-Integration
 
 Der Client in `filemaker.py` spricht die **FileMaker Data API v2**.
