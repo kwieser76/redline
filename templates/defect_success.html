@@ -4,11 +4,37 @@
 {% block content %}
 <div class="card success-card">
   <div class="success-icon">&#10003;</div>
-  <div class="card-title">Defekt erfolgreich gemeldet</div>
+  <div class="card-title">Defekt protokolliert</div>
   <div class="card-subtitle" style="margin-bottom:24px;">
-    Der Defekt für <strong>{{ device.name }}</strong> (ID: {{ device.device_id }}) wurde protokolliert.
-    Die Werkstatt wurde benachrichtigt. Das Gerät ist jetzt als <strong>Wartung</strong> markiert.
+    <strong>{{ device.name }}</strong> (ID: {{ device.device_id }}) wurde als
+    <strong>Wartung</strong> markiert.
   </div>
+
+  {% if mailto_url %}
+  <!-- E-Mail CTA -->
+  <div style="margin-bottom:28px;">
+    <a
+      id="mailto-btn"
+      href="{{ mailto_url }}"
+      class="btn btn-danger btn-block"
+      style="font-size:17px;padding:16px 24px;"
+    >
+      ✉ E-Mail jetzt senden
+    </a>
+    <p style="font-size:13px;color:var(--gray-600);margin-top:10px;text-align:center;">
+      Öffnet deinen E-Mail-Client mit dem vorausgefüllten Bericht.<br/>
+      Empfänger:
+      {% for r in recipients %}
+        <strong>{{ r.name }}</strong>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </p>
+  </div>
+  {% else %}
+  <div class="alert alert-warning" style="margin-bottom:20px;">
+    Keine E-Mail-Empfänger konfiguriert. Bitte im Admin-Bereich unter
+    <strong>E-Mail-Empfänger</strong> Adressen hinterlegen.
+  </div>
+  {% endif %}
 
   <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
     <a href="{{ url_for('report.defect_form', device_id=device.device_id) }}" class="btn btn-outline">
@@ -19,4 +45,15 @@
     </a>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if mailto_url %}
+<script>
+  // Auto-open email client after short delay so the user sees the success page first
+  setTimeout(function () {
+    window.location.href = {{ mailto_url | tojson }};
+  }, 800);
+</script>
+{% endif %}
 {% endblock %}

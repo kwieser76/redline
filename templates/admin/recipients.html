@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}E-Mail-Empfänger{% endblock %}
+
+{% block content %}
+<div class="section-title">E-Mail-Empfänger</div>
+
+<!-- Add recipient -->
+<div class="card">
+  <div class="card-title">Neuen Empfänger hinzufügen</div>
+  <div class="card-subtitle">
+    Diese Adressen werden im Defektmelde-E-Mail vorausgefüllt, wenn ein Techniker einen
+    Defekt meldet.
+  </div>
+  <form method="POST" action="{{ url_for('admin.recipients') }}" novalidate>
+    <input type="hidden" name="action" value="add" />
+    <div class="form-row">
+      <div class="form-group">
+        <label for="rec-name">Name / Abteilung</label>
+        <input
+          type="text"
+          id="rec-name"
+          name="name"
+          placeholder="z.B. Werkstatt"
+          maxlength="120"
+          required
+          autocomplete="off"
+        />
+      </div>
+      <div class="form-group">
+        <label for="rec-email">E-Mail-Adresse</label>
+        <input
+          type="email"
+          id="rec-email"
+          name="email"
+          placeholder="z.B. werkstatt@redline.de"
+          maxlength="255"
+          required
+          autocomplete="off"
+        />
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Hinzufügen</button>
+  </form>
+</div>
+
+<!-- Recipient list -->
+<div class="card">
+  <div class="card-title">Aktuelle Empfänger</div>
+  {% if recipients %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>E-Mail</th>
+          <th>Status</th>
+          <th style="text-align:right;">Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in recipients %}
+        <tr>
+          <td><strong>{{ rec.name }}</strong></td>
+          <td style="font-size:14px;">{{ rec.email }}</td>
+          <td>
+            {% if rec.active %}
+              <span class="badge badge-available">Aktiv</span>
+            {% else %}
+              <span class="badge badge-maintenance">Inaktiv</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
+            <!-- Toggle active/inactive -->
+            <form method="POST" action="{{ url_for('admin.recipients') }}" style="display:inline;">
+              <input type="hidden" name="action" value="toggle" />
+              <input type="hidden" name="rec_id" value="{{ rec.id }}" />
+              <button type="submit" class="btn btn-sm btn-secondary">
+                {% if rec.active %}Deaktivieren{% else %}Aktivieren{% endif %}
+              </button>
+            </form>
+            <!-- Delete -->
+            <form method="POST" action="{{ url_for('admin.recipients') }}" style="display:inline;">
+              <input type="hidden" name="action" value="delete" />
+              <input type="hidden" name="rec_id" value="{{ rec.id }}" />
+              <button
+                type="submit"
+                class="btn btn-sm btn-danger"
+                data-confirm="Empfänger '{{ rec.name }}' wirklich löschen?"
+              >Löschen</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:13px;color:var(--gray-600);margin-top:12px;">
+    Nur <strong>aktive</strong> Empfänger werden im mailto:-Link eingetragen.
+    Inaktive Einträge bleiben gespeichert, aber werden nicht verwendet.
+  </p>
+  {% else %}
+  <p style="color:var(--gray-600);font-size:15px;">
+    Noch keine Empfänger vorhanden. Fügen Sie oben die erste E-Mail-Adresse hinzu.
+  </p>
+  {% endif %}
+</div>
+
+<div class="action-bar">
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">← Zurück zum Dashboard</a>
+</div>
+{% endblock %}
