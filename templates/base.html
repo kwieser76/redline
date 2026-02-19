@@ -4,8 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#cc0000" />
+  <meta name="theme-color" content="#1a1a1a" />
   <title>{% block title %}Redline{% endblock %} – Defektmeldesystem</title>
+  <!-- Barlow Condensed – Redline brand font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   {% block extra_head %}{% endblock %}
 </head>
@@ -14,8 +18,13 @@
   <!-- Top navigation bar -->
   <header class="navbar">
     <div class="navbar-brand">
-      <span class="navbar-logo">&#9679;</span>
-      <span class="navbar-title">Redline</span>
+      <a href="{% if current_user.is_authenticated and current_user.is_admin %}{{ url_for('admin.dashboard') }}{% else %}/{% endif %}" class="navbar-brand-link">
+        <div class="brand-accent"></div>
+        <div class="brand-text-block">
+          <span class="brand-wordmark">re<span class="brand-d">d</span>line</span>
+          <span class="brand-tagline">Event Engineering</span>
+        </div>
+      </a>
     </div>
     {% if current_user.is_authenticated %}
     <nav class="navbar-nav">
