@@ -5,6 +5,7 @@ Main Flask application entry point.
 import io
 import logging
 import os
+import urllib.parse
 from datetime import datetime, timezone
 
 import qrcode
@@ -30,9 +31,8 @@ from flask_login import (
 from flask_mail import Mail
 
 from config import Config
-from models import Defect, DefectCategory, Device, User, db
-from filemaker import fm_client
-from notifications import send_defect_notification, send_event_summary_report
+from models import Defect, DefectCategory, Device, EmailRecipient, User, db
+from notifications import send_event_summary_report
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -153,26 +153,6 @@ def create_app(config_class=Config) -> Flask:
             device.status = "Wartung"
             db.session.commit()
 
-            # Sync to FileMaker
-            fm_client.update_device_status(device.device_id, "Wartung")
-            fm_client.create_defect_record(
-                {
-                    "Geräte-ID": device.device_id,
-                    "Gerätename": device.name,
-                    "Kategorie": category,
-                    "Beschreibung": description,
-                    "Eventname": event_name,
-                    "Projektnummer": project_number,
-                    "Status": "Offen",
-                    "Gemeldet_Von": current_user.username,
-                }
-            )
-
-            # Send email notification
-            send_defect_notification(
-                mail, defect, device.name, app.config["WORKSHOP_EMAIL"]
-            )
-
             flash("Defekt erfolgreich gemeldet.", "success")
             return redirect(url_for("report.defect_success", device_id=device.device_id))
 
@@ -187,7 +167,47 @@ def create_app(config_class=Config) -> Flask:
     @login_required
     def defect_success(device_id: str):
         device = Device.query.filter_by(device_id=device_id).first_or_404()
-        return render_template("defect_success.html", device=device)
+
+        # Latest defect for this device (just submitted)
+        defect = (
+            Defect.query.filter_by(device_id=device.id)
+            .order_by(Defect.created_at.desc())
+            .first()
+        )
+
+        # Build mailto URL from active recipients
+        recipients = EmailRecipient.query.filter_by(active=True).all()
+        mailto_url = None
+        if defect and recipients:
+            to = ",".join(r.email for r in recipients)
+            ts = defect.created_at.strftime("%d.%m.%Y %H:%M")
+            subject = f"Defekt gemeldet: {device.name} – {defect.category}"
+            body = (
+                f"DEFEKTMELDUNG\n"
+                f"=============\n\n"
+                f"Gerät:        {device.name} ({device.device_id})\n"
+                f"Kategorie:    {defect.category}\n"
+                f"Event:        {defect.event_name}\n"
+                f"Projektnr.:   {defect.project_number}\n"
+                f"Gemeldet von: {defect.reporter}\n"
+                f"Datum:        {ts}\n\n"
+                f"Beschreibung:\n{defect.description}\n\n"
+                f"---\n"
+                f"Gemeldet über das Redline Defektmeldesystem"
+            )
+            params = urllib.parse.urlencode(
+                {"subject": subject, "body": body},
+                quote_via=urllib.parse.quote,
+            )
+            mailto_url = f"mailto:{to}?{params}"
+
+        return render_template(
+            "defect_success.html",
+            device=device,
+            defect=defect,
+            mailto_url=mailto_url,
+            recipients=recipients,
+        )
 
     # ---- Admin routes ----
 
@@ -308,7 +328,6 @@ def create_app(config_class=Config) -> Flask:
         ).count()
         if open_defects == 0:
             device.status = "Verfügbar"
-            fm_client.update_device_status(device.device_id, "Verfügbar")
 
         db.session.commit()
         flash("Defekt als behoben markiert.", "success")
@@ -412,6 +431,41 @@ def create_app(config_class=Config) -> Flask:
             .all()
         )
         return render_template("admin/event_report.html", events=events)
+
+    @admin_bp.route("/recipients", methods=["GET", "POST"])
+    @admin_required
+    def recipients():
+        if request.method == "POST":
+            action = request.form.get("action")
+            if action == "add":
+                name = request.form.get("name", "").strip()
+                email = request.form.get("email", "").strip().lower()
+                if not name or not email:
+                    flash("Name und E-Mail-Adresse sind erforderlich.", "danger")
+                elif EmailRecipient.query.filter_by(email=email).first():
+                    flash(f"E-Mail '{email}' ist bereits eingetragen.", "danger")
+                else:
+                    rec = EmailRecipient(name=name, email=email)
+                    db.session.add(rec)
+                    db.session.commit()
+                    flash(f"Empfänger '{name}' wurde hinzugefügt.", "success")
+            elif action == "delete":
+                rec_id = request.form.get("rec_id", type=int)
+                rec = db.session.get(EmailRecipient, rec_id)
+                if rec:
+                    db.session.delete(rec)
+                    db.session.commit()
+                    flash(f"Empfänger '{rec.name}' wurde gelöscht.", "success")
+            elif action == "toggle":
+                rec_id = request.form.get("rec_id", type=int)
+                rec = db.session.get(EmailRecipient, rec_id)
+                if rec:
+                    rec.active = not rec.active
+                    db.session.commit()
+                    state = "aktiviert" if rec.active else "deaktiviert"
+                    flash(f"Empfänger '{rec.name}' wurde {state}.", "success")
+        all_recipients = EmailRecipient.query.order_by(EmailRecipient.name).all()
+        return render_template("admin/recipients.html", recipients=all_recipients)
 
     @admin_bp.route("/categories", methods=["GET", "POST"])
     @admin_required
@@ -522,6 +576,12 @@ def _seed_db() -> None:
         for i, name in enumerate(Config.DEFECT_CATEGORIES):
             db.session.add(DefectCategory(name=name, sort_order=i))
         logger.info("Seeded default defect categories")
+
+    if EmailRecipient.query.count() == 0:
+        workshop_email = getattr(Config, "WORKSHOP_EMAIL", None)
+        if workshop_email:
+            db.session.add(EmailRecipient(name="Werkstatt", email=workshop_email))
+            logger.info(f"Seeded default email recipient: {workshop_email}")
 
     db.session.commit()
 

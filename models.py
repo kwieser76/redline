@@ -52,6 +52,19 @@ class Device(db.Model):
         return f"<Device {self.device_id}: {self.name}>"
 
 
+class EmailRecipient(db.Model):
+    __tablename__ = "email_recipients"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def __repr__(self) -> str:
+        return f"<EmailRecipient {self.email}>"
+
+
 class DefectCategory(db.Model):
     __tablename__ = "defect_categories"
 
