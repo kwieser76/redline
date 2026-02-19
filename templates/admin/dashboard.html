@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="section-title">Dashboard</div>
+
+<!-- Stats -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value stat-blue">{{ total_devices }}</div>
+    <div class="stat-label">Geräte gesamt</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value stat-red">{{ maintenance_devices }}</div>
+    <div class="stat-label">In Wartung</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value stat-green">{{ total_devices - maintenance_devices }}</div>
+    <div class="stat-label">Verfügbar</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value stat-orange">{{ open_defects }}</div>
+    <div class="stat-label">Offene Defekte</div>
+  </div>
+</div>
+
+<!-- Quick links -->
+<div class="card">
+  <div class="card-title">Schnellzugriff</div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">
+    <a href="{{ url_for('admin.devices') }}"      class="btn btn-primary">Geräteverwaltung</a>
+    <a href="{{ url_for('admin.all_defects') }}"  class="btn btn-outline">Alle Defekte</a>
+    <a href="{{ url_for('admin.users') }}"         class="btn btn-outline">Benutzerverwaltung</a>
+    <a href="{{ url_for('admin.event_report') }}"  class="btn btn-outline">Ereignisberichte</a>
+  </div>
+</div>
+
+<!-- Devices in maintenance -->
+{% set maintenance_list = devices | selectattr('status', 'equalto', 'Wartung') | list %}
+{% if maintenance_list %}
+<div class="card">
+  <div class="card-title">Geräte in Wartung</div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Gerät</th>
+          <th>ID</th>
+          <th>Offene Defekte</th>
+          <th>Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in maintenance_list %}
+        <tr>
+          <td><strong>{{ device.name }}</strong></td>
+          <td><code>{{ device.device_id }}</code></td>
+          <td>
+            <span class="badge badge-open">{{ device.open_defect_count }}</span>
+          </td>
+          <td>
+            <a href="{{ url_for('admin.device_history', device_id=device.device_id) }}" class="btn btn-sm btn-outline">
+              Historie
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

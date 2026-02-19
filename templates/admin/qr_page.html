@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}QR-Code – {{ device.name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-title">QR-Code</div>
+  <div class="card-subtitle">{{ device.name }} ({{ device.device_id }})</div>
+
+  <div class="qr-container">
+    <img
+      src="{{ url_for('admin.generate_qr', device_id=device.device_id) }}"
+      alt="QR-Code für {{ device.name }}"
+    />
+    <div class="qr-url">{{ report_url }}</div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
+    <a href="{{ url_for('admin.generate_qr', device_id=device.device_id) }}"
+       download="qr_{{ device.device_id }}.png"
+       class="btn btn-primary">
+      QR-Code herunterladen
+    </a>
+    <a href="{{ url_for('admin.devices') }}" class="btn btn-secondary">Zurück</a>
+  </div>
+</div>
+
+<div class="card" style="font-size:14px;color:var(--gray-600);">
+  <strong>Hinweis:</strong> Drucken Sie diesen QR-Code aus und bringen Sie ihn gut sichtbar am Gerät an.
+  Beim Scannen mit einem Smartphone wird der Techniker direkt zur Defektmeldungsseite weitergeleitet.
+  Ein Login mit <strong>team_login</strong> ist erforderlich.
+</div>
+{% endblock %}

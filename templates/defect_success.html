@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Defekt gemeldet{% endblock %}
+
+{% block content %}
+<div class="card success-card">
+  <div class="success-icon">&#10003;</div>
+  <div class="card-title">Defekt erfolgreich gemeldet</div>
+  <div class="card-subtitle" style="margin-bottom:24px;">
+    Der Defekt für <strong>{{ device.name }}</strong> (ID: {{ device.device_id }}) wurde protokolliert.
+    Die Werkstatt wurde benachrichtigt. Das Gerät ist jetzt als <strong>Wartung</strong> markiert.
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
+    <a href="{{ url_for('report.defect_form', device_id=device.device_id) }}" class="btn btn-outline">
+      Weiteren Defekt melden
+    </a>
+    <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary">
+      Abmelden
+    </a>
+  </div>
+</div>
+{% endblock %}

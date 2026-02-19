@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Geräteverwaltung{% endblock %}
+
+{% block content %}
+<div class="section-title">Geräteverwaltung</div>
+
+<!-- Add device form -->
+<div class="card">
+  <div class="card-title">Neues Gerät anlegen</div>
+  <form method="POST" action="{{ url_for('admin.devices') }}" novalidate>
+    <input type="hidden" name="action" value="add" />
+    <div class="form-row">
+      <div class="form-group">
+        <label for="device_id">Geräte-ID <span style="color:var(--red)">*</span></label>
+        <input type="text" id="device_id" name="device_id" placeholder="z.B. CAM-001" required maxlength="50" />
+      </div>
+      <div class="form-group">
+        <label for="name">Gerätename <span style="color:var(--red)">*</span></label>
+        <input type="text" id="name" name="name" placeholder="z.B. Kamera Sony A7 IV" required maxlength="120" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="description">Beschreibung</label>
+      <input type="text" id="description" name="description" placeholder="Optionale Beschreibung" maxlength="255" />
+    </div>
+    <button type="submit" class="btn btn-primary">Gerät anlegen</button>
+  </form>
+</div>
+
+<!-- Device list -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title" style="margin-bottom:0">Alle Geräte ({{ devices|length }})</div>
+  </div>
+  {% if devices %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Gerät</th>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in devices %}
+        <tr>
+          <td>
+            <strong>{{ device.name }}</strong>
+            {% if device.description %}
+            <br/><span style="font-size:13px;color:var(--gray-600)">{{ device.description }}</span>
+            {% endif %}
+          </td>
+          <td><code>{{ device.device_id }}</code></td>
+          <td>
+            <span class="badge {% if device.status == 'Verfügbar' %}badge-available{% else %}badge-maintenance{% endif %}">
+              {{ device.status }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a href="{{ url_for('admin.qr_page', device_id=device.device_id) }}" class="btn btn-sm btn-outline" title="QR-Code anzeigen">
+                QR
+              </a>
+              <a href="{{ url_for('admin.device_history', device_id=device.device_id) }}" class="btn btn-sm btn-secondary">
+                Historie
+              </a>
+              <form method="POST" action="{{ url_for('admin.devices') }}" style="display:inline">
+                <input type="hidden" name="action" value="delete" />
+                <input type="hidden" name="dev_id" value="{{ device.id }}" />
+                <button type="submit" class="btn btn-sm btn-danger"
+                  data-confirm="Gerät '{{ device.name }}' wirklich löschen?">
+                  Löschen
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:var(--gray-600);text-align:center;padding:24px 0;">Noch keine Geräte angelegt.</p>
+  {% endif %}
+</div>
+{% endblock %}

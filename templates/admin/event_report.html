@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Ereignisberichte{% endblock %}
+
+{% block content %}
+<div class="section-title">Ereignisbericht senden</div>
+
+<div class="card">
+  <div class="card-title">Zusammenfassungsbericht</div>
+  <div class="card-subtitle">Nach jedem Event können Sie hier einen Bericht mit allen gemeldeten Defekten per E-Mail versenden.</div>
+
+  <form method="POST" action="{{ url_for('admin.event_report') }}" novalidate>
+    <div class="form-group">
+      <label for="event_name">Eventname <span style="color:var(--red)">*</span></label>
+      <input type="text" id="event_name" name="event_name" placeholder="z.B. Sommerfestival 2025" required maxlength="120" />
+    </div>
+    <div class="form-group">
+      <label for="project_number">Projektnummer <span style="color:var(--red)">*</span></label>
+      <input type="text" id="project_number" name="project_number" placeholder="z.B. PRJ-2025-042" required maxlength="50" />
+    </div>
+    <div class="form-group">
+      <label for="recipient">Empfänger E-Mail <span style="color:var(--red)">*</span></label>
+      <input type="email" id="recipient" name="recipient" placeholder="werkstatt@redline.local" required />
+    </div>
+    <button type="submit" class="btn btn-primary">Bericht senden</button>
+  </form>
+</div>
+
+{% if events %}
+<div class="card">
+  <div class="card-title">Bekannte Events</div>
+  <div class="card-subtitle">Klicken Sie auf ein Event, um es in das Formular zu übernehmen.</div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Eventname</th>
+          <th>Projektnummer</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event_name, project_number in events %}
+        <tr>
+          <td>{{ event_name }}</td>
+          <td><code>{{ project_number }}</code></td>
+          <td>
+            <button type="button" class="btn btn-sm btn-secondary"
+              onclick="
+                document.getElementById('event_name').value = {{ event_name | tojson }};
+                document.getElementById('project_number').value = {{ project_number | tojson }};
+                window.scrollTo({top:0,behavior:'smooth'});
+              ">
+              Übernehmen
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
