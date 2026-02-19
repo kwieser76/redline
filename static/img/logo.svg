@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 44" width="200" height="44">
+  <!-- Red accent bar -->
+  <rect x="0" y="2" width="6" height="30" fill="#E30613"/>
+  <!-- "redline" wordmark (inline SVG, font loaded from page) -->
+  <text x="16" y="26"
+    font-family="'Barlow Condensed', 'Arial Black', Impact, sans-serif"
+    font-weight="800"
+    font-size="28"
+    fill="#1a1a1a"
+    text-transform="lowercase">redline</text>
+  <!-- EVENT ENGINEERING tagline -->
+  <text x="16" y="38"
+    font-family="'Barlow Condensed', Arial, sans-serif"
+    font-weight="600"
+    font-size="9"
+    fill="#6b6b6b"
+    letter-spacing="2.5">EVENT ENGINEERING</text>
+</svg>
