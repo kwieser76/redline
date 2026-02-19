@@ -6,13 +6,13 @@ Webbasiertes Qualitätssicherungssystem für **Redline Event Engineering**. Tech
 
 ## Features
 
-### Für Techniker (mobil)
+### Für Techniker (Smartphone / iPhone)
 - **QR-Code scannen** → direkt zum Meldeformular des jeweiligen Geräts
 - **Defekt melden** – Kategorie (Dropdown), Beschreibung, Eventname, Projektnummer
 - **E-Mail-Client öffnet automatisch** – vorausgefüllter Bericht, bereit zum Abschicken
-- Gerätestatus wird sofort auf **Wartung** gesetzt
+- Gerätestatus wird sofort auf **Wartung** gesetzt *(wird in der lokalen System-Datenbank gespeichert – keine Verbindung zu FileMaker oder externen Systemen)*
 
-### Admin-Bereich
+### Admin-Bereich (PC-Browser)
 - **Geräteverwaltung** – Geräte anlegen, QR-Codes generieren & herunterladen
 - **Defektübersicht** – alle Meldungen, filterbar nach Status & Event
 - **Defekthistorie** – pro Gerät, paginiert, mit Reparatur-Workflow
@@ -35,7 +35,7 @@ Webbasiertes Qualitätssicherungssystem für **Redline Event Engineering**. Tech
 1. Admin legt Gerät an  →  QR-Code generieren & drucken
 2. Techniker scannt QR-Code am Gerät
 3. Techniker füllt Formular aus (Kategorie, Beschreibung, Event, Projektnr.)
-4. Absenden  →  Defekt wird in DB gespeichert, Gerät → „Wartung"
+4. Absenden  →  Defekt wird in lokaler DB gespeichert, Gerätestatus → „Wartung" (nur im System)
 5. E-Mail-Client öffnet automatisch mit vorausgefülltem Bericht
 6. Techniker schickt E-Mail ab  →  Empfänger erhalten die Meldung
 7. Werkstatt repariert das Gerät
