@@ -30,7 +30,7 @@ from flask_login import (
 from flask_mail import Mail
 
 from config import Config
-from models import Defect, Device, User, db
+from models import Defect, DefectCategory, Device, User, db
 from filemaker import fm_client
 from notifications import send_defect_notification, send_event_summary_report
 
@@ -107,7 +107,10 @@ def create_app(config_class=Config) -> Flask:
                 message=f"Das Gerät mit der ID '{device_id}' ist im System nicht registriert.",
             ), 404
 
-        categories = app.config["DEFECT_CATEGORIES"]
+        categories = [
+            c.name for c in DefectCategory.query
+            .order_by(DefectCategory.sort_order, DefectCategory.name).all()
+        ]
 
         if request.method == "POST":
             category = request.form.get("category", "").strip()
@@ -410,6 +413,59 @@ def create_app(config_class=Config) -> Flask:
         )
         return render_template("admin/event_report.html", events=events)
 
+    @admin_bp.route("/categories", methods=["GET", "POST"])
+    @admin_required
+    def categories():
+        if request.method == "POST":
+            action = request.form.get("action")
+            if action == "add":
+                name = request.form.get("name", "").strip()
+                if not name:
+                    flash("Name ist erforderlich.", "danger")
+                elif DefectCategory.query.filter_by(name=name).first():
+                    flash(f"Kategorie '{name}' existiert bereits.", "danger")
+                else:
+                    max_order = db.session.query(
+                        db.func.max(DefectCategory.sort_order)
+                    ).scalar() or 0
+                    cat = DefectCategory(name=name, sort_order=max_order + 1)
+                    db.session.add(cat)
+                    db.session.commit()
+                    flash(f"Kategorie '{name}' wurde angelegt.", "success")
+            elif action == "delete":
+                cat_id = request.form.get("cat_id", type=int)
+                cat = db.session.get(DefectCategory, cat_id)
+                if cat:
+                    db.session.delete(cat)
+                    db.session.commit()
+                    flash(f"Kategorie '{cat.name}' wurde gelöscht.", "success")
+            elif action == "move_up":
+                cat_id = request.form.get("cat_id", type=int)
+                _move_category(cat_id, direction="up")
+            elif action == "move_down":
+                cat_id = request.form.get("cat_id", type=int)
+                _move_category(cat_id, direction="down")
+        all_cats = DefectCategory.query.order_by(
+            DefectCategory.sort_order, DefectCategory.name
+        ).all()
+        return render_template("admin/categories.html", categories=all_cats)
+
+    def _move_category(cat_id: int, direction: str) -> None:
+        cats = DefectCategory.query.order_by(
+            DefectCategory.sort_order, DefectCategory.name
+        ).all()
+        idx = next((i for i, c in enumerate(cats) if c.id == cat_id), None)
+        if idx is None:
+            return
+        swap_idx = idx - 1 if direction == "up" else idx + 1
+        if swap_idx < 0 or swap_idx >= len(cats):
+            return
+        cats[idx].sort_order, cats[swap_idx].sort_order = (
+            cats[swap_idx].sort_order,
+            cats[idx].sort_order,
+        )
+        db.session.commit()
+
     # ---- Register blueprints ----
     from api import api_bp
     app.register_blueprint(auth_bp)
@@ -461,6 +517,11 @@ def _seed_db() -> None:
         team.set_password("team2025")  # Change regularly
         db.session.add(team)
         logger.info("Created community user team_login (password: team2025)")
+
+    if DefectCategory.query.count() == 0:
+        for i, name in enumerate(Config.DEFECT_CATEGORIES):
+            db.session.add(DefectCategory(name=name, sort_order=i))
+        logger.info("Seeded default defect categories")
 
     db.session.commit()
 
