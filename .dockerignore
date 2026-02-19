@@ -1,0 +1,45 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Secrets & local config – NEVER bake these into the image
+.env
+*.env
+
+# Development databases – use the Docker volume instead
+*.db
+*.sqlite3
+
+# Generated QR codes – mounted as a volume
+static/qrcodes/
+
+# Tests & CI artefacts
+tests/
+.coverage
+htmlcov/
+.pytest_cache/
+*.xml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store

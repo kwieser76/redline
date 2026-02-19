@@ -1,7 +1,17 @@
+"""
+Redline – SQLAlchemy database models.
+
+All timestamps are stored in UTC.  Status fields use German values to match
+the UI and FileMaker integration:
+  Device.status   : "Verfügbar" | "Wartung"
+  Defect.status   : "Offen"     | "Behoben"
+"""
+
 from datetime import datetime, timezone
-from flask_sqlalchemy import SQLAlchemy
+
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
 
@@ -10,11 +20,13 @@ class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
-    is_community = db.Column(db.Boolean, default=False)  # team_login user
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    is_community = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -30,18 +42,26 @@ class Device(db.Model):
     __tablename__ = "devices"
 
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.String(50), unique=True, nullable=False)
+    device_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, default="")
     status = db.Column(
         db.String(20),
         default="Verfügbar",
         nullable=False,
+        index=True,
     )  # "Verfügbar" | "Wartung"
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
+    # Cascade: deleting a device also deletes all its defect records.
     defects = db.relationship(
-        "Defect", backref="device", lazy=True, order_by="Defect.created_at.desc()"
+        "Defect",
+        backref="device",
+        lazy=True,
+        order_by="Defect.created_at.desc()",
+        cascade="all, delete-orphan",
     )
 
     @property
@@ -57,9 +77,11 @@ class EmailRecipient(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(255), unique=True, nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     active = db.Column(db.Boolean, default=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     def __repr__(self) -> str:
         return f"<EmailRecipient {self.email}>"
@@ -69,9 +91,11 @@ class DefectCategory(db.Model):
     __tablename__ = "defect_categories"
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80), unique=True, nullable=False)
-    sort_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    name = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     def __repr__(self) -> str:
         return f"<DefectCategory {self.name}>"
@@ -79,6 +103,13 @@ class DefectCategory(db.Model):
 
 class Defect(db.Model):
     __tablename__ = "defects"
+    __table_args__ = (
+        # Indexes on the most common filter/join columns
+        db.Index("ix_defects_device_id", "device_id"),
+        db.Index("ix_defects_status", "status"),
+        db.Index("ix_defects_project_number", "project_number"),
+        db.Index("ix_defects_created_at", "created_at"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=False)
@@ -86,9 +117,13 @@ class Defect(db.Model):
     description = db.Column(db.Text, nullable=False)
     event_name = db.Column(db.String(120), nullable=False)
     project_number = db.Column(db.String(50), nullable=False)
-    status = db.Column(db.String(20), default="Offen", nullable=False)  # "Offen" | "Behoben"
-    reporter = db.Column(db.String(80), default="team_login")
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    status = db.Column(
+        db.String(20), default="Offen", nullable=False
+    )  # "Offen" | "Behoben"
+    reporter = db.Column(db.String(80), default="team_login", nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     resolved_at = db.Column(db.DateTime, nullable=True)
     resolution_notes = db.Column(db.Text, default="")
 

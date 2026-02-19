@@ -212,7 +212,7 @@ class TestUserManagement:
     def test_add_admin_user(self, app, admin_client):
         admin_client.post(
             "/admin/users",
-            data={"action": "add", "username": "newadmin", "password": "pass", "is_admin": "on"},
+            data={"action": "add", "username": "newadmin", "password": "securepass1", "is_admin": "on"},
         )
         with app.app_context():
             u = User.query.filter_by(username="newadmin").first()
@@ -254,7 +254,7 @@ class TestUserManagement:
     def test_delete_regular_user(self, app, admin_client):
         admin_client.post(
             "/admin/users",
-            data={"action": "add", "username": "tobedeleted", "password": "pass"},
+            data={"action": "add", "username": "tobedeleted", "password": "password123"},
         )
         with app.app_context():
             u = User.query.filter_by(username="tobedeleted").first()
@@ -268,7 +268,7 @@ class TestUserManagement:
     def test_change_password(self, app, admin_client):
         admin_client.post(
             "/admin/users",
-            data={"action": "add", "username": "changepw", "password": "oldpass"},
+            data={"action": "add", "username": "changepw", "password": "oldpass123"},
         )
         with app.app_context():
             u = User.query.filter_by(username="changepw").first()
@@ -282,7 +282,7 @@ class TestUserManagement:
         with app.app_context():
             u = User.query.filter_by(username="changepw").first()
             assert u.check_password("newpass456") is True
-            assert u.check_password("oldpass") is False
+            assert u.check_password("oldpass123") is False
 
 
 class TestRecipientManagement:

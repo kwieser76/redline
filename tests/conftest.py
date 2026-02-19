@@ -1,37 +1,25 @@
 """
 Shared pytest fixtures for the Redline test suite.
 
-App is created once per session with an in-memory SQLite database.
+The app is created once per session with an in-memory SQLite database.
 Between tests the autouse clean_db fixture rolls back and removes all
 test-generated rows while preserving the seeded defaults (admin/team_login
 users, default categories, default workshop recipient).
 """
+
 import base64
 
 import pytest
 
 from app import create_app
-from config import Config
+from config import Config, TestConfig
 from models import db as _db, Defect, DefectCategory, Device, EmailRecipient, User
 
 
-# ---------------------------------------------------------------------------
-# Test configuration
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#  Session-scoped app (DB created once, cleaned between tests)                 #
+# --------------------------------------------------------------------------- #
 
-class TestConfig(Config):
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
-    WTF_CSRF_ENABLED = False
-    SECRET_KEY = "test-secret-key-do-not-use-in-production"
-    MAIL_SUPPRESS_SEND = True
-    APP_BASE_URL = "http://testserver"
-    QR_CODE_DIR = "/tmp/test_redline_qrcodes"
-
-
-# ---------------------------------------------------------------------------
-# Session-scoped app (DB created once, cleaned between tests)
-# ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
 def app():
@@ -49,24 +37,23 @@ def clean_db(app):
     yield
     with app.app_context():
         _db.session.rollback()
-        # Order matters: child tables first (FK constraints)
+        # Child tables first (FK constraints)
         Defect.query.delete()
         Device.query.delete()
         EmailRecipient.query.filter(
             EmailRecipient.email != Config.WORKSHOP_EMAIL
         ).delete()
-        User.query.filter(
-            ~User.username.in_(["admin", "team_login"])
-        ).delete()
+        User.query.filter(~User.username.in_(["admin", "team_login"])).delete()
         DefectCategory.query.filter(
             ~DefectCategory.name.in_(Config.DEFECT_CATEGORIES)
         ).delete()
         _db.session.commit()
 
 
-# ---------------------------------------------------------------------------
-# HTTP client fixtures
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#  HTTP client fixtures                                                         #
+# --------------------------------------------------------------------------- #
+
 
 @pytest.fixture
 def client(app):
@@ -97,19 +84,24 @@ def admin_client(client):
 @pytest.fixture
 def team_client(client):
     """Test client with an active team_login session."""
-    client.post("/auth/login", data={"username": "team_login", "password": "team2025"})
+    client.post(
+        "/auth/login", data={"username": "team_login", "password": "team2025"}
+    )
     return client
 
 
-# ---------------------------------------------------------------------------
-# Data fixtures (return plain dicts to avoid DetachedInstanceError)
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+#  Data fixtures (return plain dicts to avoid DetachedInstanceError)           #
+# --------------------------------------------------------------------------- #
+
 
 @pytest.fixture
 def device(app):
     """Insert a test device and return its key attributes as a dict."""
     with app.app_context():
-        d = Device(device_id="CAM-001", name="Kamera Alpha", description="Testbeschreibung")
+        d = Device(
+            device_id="CAM-001", name="Kamera Alpha", description="Testbeschreibung"
+        )
         _db.session.add(d)
         _db.session.commit()
         return {"id": d.id, "device_id": d.device_id, "name": d.name}
