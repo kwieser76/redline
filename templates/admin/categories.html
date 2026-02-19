@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Kategorien{% endblock %}
+
+{% block content %}
+<div class="section-title">Defektkategorien</div>
+
+<!-- Add category -->
+<div class="card">
+  <div class="card-title">Neue Kategorie</div>
+  <div class="card-subtitle">Kategorien erscheinen im Dropdown des Defektmeldeformulars.</div>
+  <form method="POST" action="{{ url_for('admin.categories') }}" novalidate>
+    <input type="hidden" name="action" value="add" />
+    <div style="display:flex;gap:10px;align-items:flex-end;">
+      <div class="form-group" style="flex:1;margin-bottom:0;">
+        <label for="name">Kategoriename</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          placeholder="z.B. Optikschaden"
+          maxlength="80"
+          required
+          autocomplete="off"
+        />
+      </div>
+      <button type="submit" class="btn btn-primary">Hinzufügen</button>
+    </div>
+  </form>
+</div>
+
+<!-- Category list -->
+<div class="card">
+  <div class="card-title">Vorhandene Kategorien</div>
+  {% if categories %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th style="text-align:right;">Reihenfolge</th>
+          <th style="text-align:right;">Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in categories %}
+        <tr>
+          <td style="color:var(--gray-400);font-size:13px;">{{ loop.index }}</td>
+          <td><strong>{{ cat.name }}</strong></td>
+          <td style="text-align:right;">
+            <!-- Move up -->
+            {% if not loop.first %}
+            <form method="POST" action="{{ url_for('admin.categories') }}" style="display:inline;">
+              <input type="hidden" name="action" value="move_up" />
+              <input type="hidden" name="cat_id" value="{{ cat.id }}" />
+              <button type="submit" class="btn btn-sm btn-secondary" title="Nach oben">↑</button>
+            </form>
+            {% endif %}
+            <!-- Move down -->
+            {% if not loop.last %}
+            <form method="POST" action="{{ url_for('admin.categories') }}" style="display:inline;">
+              <input type="hidden" name="action" value="move_down" />
+              <input type="hidden" name="cat_id" value="{{ cat.id }}" />
+              <button type="submit" class="btn btn-sm btn-secondary" title="Nach unten">↓</button>
+            </form>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            <form method="POST" action="{{ url_for('admin.categories') }}" style="display:inline;">
+              <input type="hidden" name="action" value="delete" />
+              <input type="hidden" name="cat_id" value="{{ cat.id }}" />
+              <button
+                type="submit"
+                class="btn btn-sm btn-danger"
+                data-confirm="Kategorie '{{ cat.name }}' wirklich löschen?"
+              >Löschen</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:var(--gray-600);font-size:15px;">
+    Noch keine Kategorien vorhanden. Legen Sie oben die erste Kategorie an.
+  </p>
+  {% endif %}
+</div>
+
+<div class="action-bar">
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">← Zurück zum Dashboard</a>
+</div>
+{% endblock %}

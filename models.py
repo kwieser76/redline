@@ -52,6 +52,18 @@ class Device(db.Model):
         return f"<Device {self.device_id}: {self.name}>"
 
 
+class DefectCategory(db.Model):
+    __tablename__ = "defect_categories"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def __repr__(self) -> str:
+        return f"<DefectCategory {self.name}>"
+
+
 class Defect(db.Model):
     __tablename__ = "defects"
 
