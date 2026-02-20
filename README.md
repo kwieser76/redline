@@ -11,6 +11,17 @@ Webbasiertes Qualitätssicherungssystem für **Redline Event Engineering**. Tech
 
 ---
 
+## Dokumentation
+
+| Dokument | Inhalt |
+|----------|--------|
+| [API-Referenz](docs/API.md) | Alle REST-Endpunkte, Authentifizierung, Request/Response-Format, curl-Beispiele |
+| [Technische Dokumentation](docs/TECHNICAL.md) | Architektur, Datenbankschema, Sicherheit, Deployment, NFR-Übersicht |
+| [Installations-Anleitung](docs/INSTALLATION.md) | Lokale Entwicklung, Docker Compose, Bare-Metal (Gunicorn + Nginx), Migrationen |
+| [Fachliche Dokumentation](docs/BUSINESS.md) | Geschäftsprozesse, Anwendungsfälle, Rollen, Datenstrategie, Glossar |
+
+---
+
 ## Features
 
 ### Für Techniker (Smartphone / iPhone)
@@ -143,35 +154,63 @@ Beim ersten App-Start werden folgende Standard-Kategorien automatisch eingespiel
 
 ```
 Redline-/
-├── app.py                        # Flask-Anwendung (Blueprints, alle Routen)
-├── models.py                     # DB-Modelle (s. unten)
-├── config.py                     # Konfiguration & Seed-Daten
-├── notifications.py              # Server-E-Mail für Ereignisberichte
+├── app.py                        # App-Factory (create_app), Fehlerhandler, Seed
+├── config.py                     # DevelopmentConfig / ProductionConfig / TestConfig
+├── extensions.py                 # Flask-Limiter, Flask-Migrate (shared instances)
+├── models.py                     # SQLAlchemy-Modelle + DB-Instanz
+├── api.py                        # REST API Blueprint (/api/v1/*)
+├── notifications.py              # E-Mail-Helfer (Defektmeldung, Ereignisbericht)
+├── filemaker.py                  # FileMaker-Data-API-Client (optional)
 ├── requirements.txt
 ├── .env.example
+├── Dockerfile                    # Multi-Stage Production Image
+├── docker-compose.yml            # Docker Compose Deployment
+│
+├── routes/                       # Web-UI-Blueprints
+│   ├── auth.py                   # /auth/login, /auth/logout
+│   ├── report.py                 # /report/<device_id>
+│   └── admin.py                  # /admin/* + admin_required-Decorator
 │
 ├── static/
 │   ├── css/style.css             # Redline Brand CSS (schwarz/rot, Barlow Condensed)
 │   ├── js/main.js                # Auto-dismiss Alerts, Bestätigungsdialoge
 │   ├── img/logo.svg              # Redline Wortmarke (SVG)
+│   ├── openapi.yaml              # OpenAPI 3.0 Spezifikation (Swagger-Quelle)
 │   └── qrcodes/                  # Generierte QR-Code-Bilder
 │
-└── templates/
-    ├── base.html                 # Layout (Navbar mit Logo, Google Fonts)
-    ├── login.html                # Login-Seite (schwarzes Branding)
-    ├── report_defect.html        # Defektmeldeformular (mobil-optimiert)
-    ├── defect_success.html       # Erfolgsseite mit mailto:-Button & Auto-Open
-    ├── error.html
-    └── admin/
-        ├── dashboard.html        # Admin-Übersicht mit Schnellzugriff
-        ├── devices.html          # Geräteverwaltung
-        ├── qr_page.html          # QR-Code anzeigen & herunterladen
-        ├── device_history.html   # Defekthistorie pro Gerät + Reparatur
-        ├── all_defects.html      # Alle Defekte (Filter, Pagination)
-        ├── users.html            # Benutzerverwaltung
-        ├── event_report.html     # Ereignisbericht versenden
-        ├── categories.html       # Defektkategorien verwalten
-        └── recipients.html       # E-Mail-Empfänger verwalten
+├── templates/
+│   ├── base.html                 # Layout (Navbar mit Logo, Google Fonts)
+│   ├── login.html                # Login-Seite (schwarzes Branding)
+│   ├── report_defect.html        # Defektmeldeformular (mobil-optimiert)
+│   ├── defect_success.html       # Erfolgsseite mit mailto:-Button & Auto-Open
+│   ├── error.html
+│   └── admin/
+│       ├── dashboard.html        # Admin-Übersicht mit Schnellzugriff
+│       ├── devices.html          # Geräteverwaltung
+│       ├── qr_page.html          # QR-Code anzeigen & herunterladen
+│       ├── device_history.html   # Defekthistorie pro Gerät + Reparatur
+│       ├── all_defects.html      # Alle Defekte (Filter, Pagination)
+│       ├── users.html            # Benutzerverwaltung
+│       ├── event_report.html     # Ereignisbericht versenden
+│       ├── categories.html       # Defektkategorien verwalten
+│       └── recipients.html       # E-Mail-Empfänger verwalten
+│
+├── docs/
+│   ├── API.md                    # REST API Referenz
+│   ├── TECHNICAL.md              # Technische Architektur & NFR
+│   ├── INSTALLATION.md           # Installation & Deployment
+│   └── BUSINESS.md               # Fachliche Dokumentation & Prozesse
+│
+└── tests/
+    ├── conftest.py               # Fixtures, TestConfig, clean_db
+    ├── test_auth.py              # Authentifizierungs-Tests
+    ├── test_models.py            # ORM-Unit-Tests
+    ├── test_api.py               # REST-API-Vertrags-Tests
+    ├── test_admin.py             # Admin-Routen-Tests
+    ├── test_report.py            # Defektformular-Tests
+    ├── test_notifications.py     # E-Mail-Tests
+    ├── test_nfr.py               # Nicht-funktionale Anforderungen
+    └── test_business.py          # End-to-End-Geschäftsprozesse
 ```
 
 ---
