@@ -20,6 +20,12 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 _DEFAULT_SECRET = "change-me-in-production-secret-key"
 
+# Application version – read from the VERSION file at the project root
+_version_file = os.path.join(BASE_DIR, "VERSION")
+APP_VERSION: str = (
+    open(_version_file).read().strip() if os.path.exists(_version_file) else "unknown"
+)
+
 
 class Config:
     """Base configuration shared by all environments."""
