@@ -2,6 +2,8 @@
 Authentication blueprint – /auth/*
 """
 
+from urllib.parse import urlparse
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
@@ -9,6 +11,19 @@ from extensions import limiter
 from models import User
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+
+def _is_safe_url(target: str | None) -> bool:
+    """Return True only if *target* is a relative URL with no host or scheme.
+
+    This prevents open-redirect attacks where an attacker supplies a
+    ``?next=http://evil.com`` parameter to redirect victims off-site after
+    a successful login.
+    """
+    if not target:
+        return False
+    parsed = urlparse(target)
+    return not parsed.netloc and not parsed.scheme
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -24,7 +39,8 @@ def login():
         if user and user.check_password(password):
             login_user(user, remember=False)
             next_page = request.args.get("next")
-            return redirect(next_page or url_for("index"))
+            safe_next = next_page if _is_safe_url(next_page) else None
+            return redirect(safe_next or url_for("index"))
         flash("Ungültiger Benutzername oder Passwort.", "danger")
 
     return render_template("login.html")
