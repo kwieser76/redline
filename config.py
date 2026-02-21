@@ -78,7 +78,7 @@ class Config:
     # ------------------------------------------------------------------ #
     RATELIMIT_ENABLED: bool = True
     RATELIMIT_STORAGE_URL: str = os.environ.get("RATELIMIT_STORAGE_URL", "memory://")
-    RATELIMIT_DEFAULT: list = ["200 per hour", "50 per minute"]
+    RATELIMIT_DEFAULT: str = "200 per hour;50 per minute"
 
     # ------------------------------------------------------------------ #
     #  Seed / domain data                                                  #
