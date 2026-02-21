@@ -24,3 +24,7 @@ python-dotenv==1.0.1
 
 # Production WSGI server
 gunicorn==23.0.0
+
+# Observability – Prometheus metrics
+prometheus-flask-exporter==0.23.1
+prometheus-client==0.21.1

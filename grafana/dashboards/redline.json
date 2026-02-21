@@ -1,0 +1,645 @@
+{
+  "__inputs": [],
+  "__elements": {},
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Redline QR-Defect Reporting – Operations Dashboard. Health · HTTP Traffic · Business Metrics · System Resources.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "🟢 System Health",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "color": "red",   "index": 0, "text": "DOWN" },
+                           "1": { "color": "green", "index": 1, "text": "UP"   } },
+              "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red",   "value": null },
+            { "color": "green", "value": 1    }
+          ]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "up{job=\"redline\"}", "legendFormat": "App", "refId": "A" }
+      ],
+      "title": "App Status",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "color": "red",   "index": 0, "text": "ERROR" },
+                           "1": { "color": "green", "index": 1, "text": "OK"    } },
+              "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red",   "value": null },
+            { "color": "green", "value": 1    }
+          ]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_db_up", "legendFormat": "DB", "refId": "A" }
+      ],
+      "title": "DB Status",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }
+          ]},
+          "unit": "dtdhms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 8, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "time() - process_start_time_seconds{job=\"redline\"}", "legendFormat": "Uptime", "refId": "A" }
+      ],
+      "title": "Process Uptime",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green",  "value": null },
+            { "color": "yellow", "value": 1    },
+            { "color": "red",    "value": 5    }
+          ]},
+          "unit": "percent",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 5, "x": 14, "y": 1 },
+      "id": 5,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(rate(flask_http_request_total{job=\"redline\",status=~\"5..\"}[5m])) / sum(rate(flask_http_request_total{job=\"redline\"}[5m])) * 100",
+          "legendFormat": "5xx %", "refId": "A" }
+      ],
+      "title": "HTTP 5xx Error Rate",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null }
+          ]},
+          "unit": "reqps",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 1 },
+      "id": 6,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(rate(flask_http_request_total{job=\"redline\"}[1m]))",
+          "legendFormat": "req/s", "refId": "A" }
+      ],
+      "title": "Request Rate (1 m)",
+      "type": "stat"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 10,
+      "title": "📈 HTTP Traffic",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "",
+                       "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+                       "fillOpacity": 15, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                       "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+                       "scaleDistribution": { "type": "linear" }, "showPoints": "auto",
+                       "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                       "thresholdsStyle": { "mode": "off" } },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
+      "id": 11,
+      "options": { "legend": { "calcs": ["mean","max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+                   "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(rate(flask_http_request_total{job=\"redline\",status=~\"2..\"}[1m]))",
+          "legendFormat": "2xx", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(rate(flask_http_request_total{job=\"redline\",status=~\"3..\"}[1m]))",
+          "legendFormat": "3xx", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(rate(flask_http_request_total{job=\"redline\",status=~\"4..\"}[1m]))",
+          "legendFormat": "4xx", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(rate(flask_http_request_total{job=\"redline\",status=~\"5..\"}[1m]))",
+          "legendFormat": "5xx", "refId": "D" }
+      ],
+      "title": "Requests per Second by Status Class",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "",
+                       "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+                       "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                       "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+                       "scaleDistribution": { "type": "linear" }, "showPoints": "auto",
+                       "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                       "thresholdsStyle": { "mode": "off" } },
+          "unit": "ms",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 6 },
+      "id": 12,
+      "options": { "legend": { "calcs": ["mean","max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+                   "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "histogram_quantile(0.50, sum(rate(flask_http_request_duration_seconds_bucket{job=\"redline\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p50", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket{job=\"redline\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p95", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(flask_http_request_duration_seconds_bucket{job=\"redline\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p99", "refId": "C" }
+      ],
+      "title": "Request Latency p50 / p95 / p99",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 15 },
+      "id": 13,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true,
+                               "values": ["value", "percent"] },
+                   "pieType": "donut", "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(flask_http_request_total{job=\"redline\",status=~\"2..\"}) or vector(0)",
+          "legendFormat": "2xx", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(flask_http_request_total{job=\"redline\",status=~\"3..\"}) or vector(0)",
+          "legendFormat": "3xx", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(flask_http_request_total{job=\"redline\",status=~\"4..\"}) or vector(0)",
+          "legendFormat": "4xx", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(flask_http_request_total{job=\"redline\",status=~\"5..\"}) or vector(0)",
+          "legendFormat": "5xx", "refId": "D" }
+      ],
+      "title": "HTTP Status Distribution (all-time)",
+      "type": "piechart"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "unit": "short",
+                      "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Requests" },
+            "properties": [{ "id": "custom.width", "value": 100 }] },
+          { "matcher": { "id": "byName", "options": "Endpoint" },
+            "properties": [{ "id": "custom.width", "value": 320 }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 8, "y": 15 },
+      "id": 14,
+      "options": { "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+                   "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Requests" }] },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sort_desc(sum(flask_http_request_total{job=\"redline\"}) by (path, method))",
+          "format": "table", "instant": true, "legendFormat": "", "refId": "A" }
+      ],
+      "title": "Top Endpoints by Request Count",
+      "transformations": [
+        { "id": "organize", "options": {
+            "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true },
+            "renameByName": { "Value": "Requests", "path": "Endpoint", "method": "Method" }
+        }}
+      ],
+      "type": "table"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 20,
+      "title": "📊 Business Metrics",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null }
+          ]},
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 25 },
+      "id": 21,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_devices_total", "legendFormat": "Devices", "refId": "A" }
+      ],
+      "title": "Total Devices",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green",  "value": null },
+            { "color": "yellow", "value": 5    },
+            { "color": "red",    "value": 20   }
+          ]},
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 25 },
+      "id": 22,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_defects_total{state=\"open\"}", "legendFormat": "Open Defects", "refId": "A" }
+      ],
+      "title": "Open Defects",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 3  },
+            { "color": "orange", "value": 6  }
+          ]},
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 25 },
+      "id": 23,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_active_events_total", "legendFormat": "Active Events", "refId": "A" }
+      ],
+      "title": "Active Events (with open defects)",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null }
+          ]},
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 25 },
+      "id": 24,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_email_recipients_active_total", "legendFormat": "Recipients", "refId": "A" }
+      ],
+      "title": "Active Email Recipients",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null }
+          ]},
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 25 },
+      "id": 25,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sum(redline_users_total)", "legendFormat": "Users", "refId": "A" }
+      ],
+      "title": "Total Users",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 1 }
+          ]},
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 25 },
+      "id": 26,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center",
+                   "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+                   "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_device_status_total{status=\"Wartung\"}", "legendFormat": "In Wartung", "refId": "A" }
+      ],
+      "title": "Devices in Maintenance",
+      "type": "stat"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Open (Offen)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Resolved (Behoben)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 29 },
+      "id": 27,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true,
+                               "values": ["value","percent"] },
+                   "pieType": "donut", "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_defects_total{state=\"open\"}", "legendFormat": "Open (Offen)", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "redline_defects_total{state=\"resolved\"}", "legendFormat": "Resolved (Behoben)", "refId": "B" }
+      ],
+      "title": "Defects by Status",
+      "type": "piechart"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisLabel": "", "axisPlacement": "auto", "fillOpacity": 80,
+                       "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                       "lineWidth": 1, "scaleDistribution": { "type": "linear" }, "thresholdsStyle": { "mode": "off" } },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 8, "y": 29 },
+      "id": 28,
+      "options": { "barRadius": 0.05, "barWidth": 0.7, "fullHighlight": false, "groupWidth": 0.7,
+                   "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+                   "orientation": "auto", "showValue": "auto", "stacking": "none",
+                   "tooltip": { "mode": "multi", "sort": "none" }, "xTickLabelMaxLength": 20,
+                   "xTickLabelRotation": -30, "xTickLabelSpacing": 100 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "sort_desc(redline_defects_by_category_total)", "legendFormat": "{{category}}", "refId": "A" }
+      ],
+      "title": "Defects by Category (all-time)",
+      "type": "barchart"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "id": 30,
+      "title": "⚙️ System Resources",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "",
+                       "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+                       "fillOpacity": 20, "gradientMode": "scheme", "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                       "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+                       "scaleDistribution": { "type": "linear" }, "showPoints": "auto",
+                       "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                       "thresholdsStyle": { "mode": "off" } },
+          "unit": "decmbytes",
+          "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green",  "value": null },
+            { "color": "yellow", "value": 256  },
+            { "color": "red",    "value": 512  }
+          ]}
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "id": 31,
+      "options": { "legend": { "calcs": ["mean","max","last"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+                   "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "process_resident_memory_bytes{job=\"redline\"} / 1024 / 1024",
+          "legendFormat": "RSS Memory (MB)", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "process_virtual_memory_bytes{job=\"redline\"} / 1024 / 1024",
+          "legendFormat": "Virtual Memory (MB)", "refId": "B" }
+      ],
+      "title": "Python Process Memory",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "",
+                       "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+                       "fillOpacity": 20, "gradientMode": "scheme", "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                       "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+                       "scaleDistribution": { "type": "linear" }, "showPoints": "auto",
+                       "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                       "thresholdsStyle": { "mode": "off" } },
+          "unit": "percent",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "id": 32,
+      "options": { "legend": { "calcs": ["mean","max","last"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+                   "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "redline-prometheus" },
+          "expr": "rate(process_cpu_seconds_total{job=\"redline\"}[1m]) * 100",
+          "legendFormat": "CPU Usage (%)", "refId": "A" }
+      ],
+      "title": "Python Process CPU",
+      "type": "timeseries"
+    }
+
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["redline", "flask", "operations"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Redline Operations Dashboard",
+  "uid": "redline-ops-v1",
+  "version": 1,
+  "weekStart": ""
+}
