@@ -1,16 +1,24 @@
 # ---------------------------------------------------------------------------
 # Redline – Docker Compose deployment
 #
+# Services:
+#   redline    – Flask application (gunicorn)
+#   prometheus – Metrics collection & storage
+#   grafana    – Observability dashboard (auto-provisioned)
+#
 # Usage:
-#   cp .env.example .env   # fill in all required values
+#   cp .env.example .env          # fill in all required values
 #   docker compose up -d
 #   docker compose logs -f
 #
-# For production, swap the SQLite volume for a PostgreSQL service and
-# set DATABASE_URL accordingly.
+# Grafana: http://localhost:3000  (admin / see GRAFANA_ADMIN_PASSWORD in .env)
+# Metrics: http://localhost:8000/metrics
+# Health:  http://localhost:8000/healthz
 # ---------------------------------------------------------------------------
 
 services:
+
+  # ── Flask Application ─────────────────────────────────────────────────────
   redline:
     build:
       context: .
@@ -27,19 +35,16 @@ services:
       - .env
 
     environment:
-      # Override DATABASE_URL to use the named volume path
       DATABASE_URL: "sqlite:////app/data/redline.db"
       FLASK_ENV: "production"
 
     volumes:
-      # SQLite database persisted across container restarts
       - redline_data:/app/data
-      # Generated QR code PNGs
       - redline_qrcodes:/app/static/qrcodes
 
     healthcheck:
       test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
       interval: 30s
       timeout: 10s
       start_period: 15s
@@ -51,8 +56,78 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  # ── Prometheus ────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: redline_prometheus
+    restart: unless-stopped
+
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+
+    depends_on:
+      redline:
+        condition: service_healthy
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ── Grafana ───────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: redline_grafana
+    restart: unless-stopped
+
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-redline-grafana}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/redline.json"
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+    depends_on:
+      - prometheus
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+# ---------------------------------------------------------------------------
+# Named volumes – data persists across container restarts
+# ---------------------------------------------------------------------------
+
 volumes:
   redline_data:
     driver: local
   redline_qrcodes:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local

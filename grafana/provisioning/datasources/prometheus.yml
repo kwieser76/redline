@@ -1,0 +1,19 @@
+# ---------------------------------------------------------------------------
+# Grafana datasource – Prometheus
+#
+# Auto-provisioned on container start. No manual UI configuration needed.
+# ---------------------------------------------------------------------------
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: redline-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: GET
+      timeInterval: "15s"

@@ -1,0 +1,33 @@
+# ---------------------------------------------------------------------------
+# Prometheus – scrape configuration for Redline
+#
+# Prometheus scrapes /metrics from the Redline Flask app every 15 seconds.
+# Business metrics are served from the same endpoint via the custom collector
+# in metrics.py.
+# ---------------------------------------------------------------------------
+
+global:
+  scrape_interval:     15s   # pull metrics from targets every 15 s
+  evaluation_interval: 15s   # evaluate alerting rules every 15 s
+  scrape_timeout:      10s
+
+  # Attach these labels to all time-series produced by this Prometheus instance.
+  external_labels:
+    monitor: "redline"
+
+# ---------------------------------------------------------------------------
+# Scrape configs
+# ---------------------------------------------------------------------------
+
+scrape_configs:
+
+  # Flask application metrics (HTTP traffic + business metrics)
+  - job_name: "redline"
+    static_configs:
+      - targets: ["redline:8000"]
+    metrics_path: "/metrics"
+
+  # Prometheus itself (useful for meta-monitoring)
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

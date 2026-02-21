@@ -6,12 +6,14 @@ Application factory.
 import logging
 import os
 
-from flask import Flask, redirect, render_template, url_for
+from flask import Flask, jsonify, redirect, render_template, url_for
 from flask_login import LoginManager, current_user
 from flask_mail import Mail
+from sqlalchemy import text
 
 from config import Config, config_by_name
-from extensions import limiter, migrate
+from extensions import limiter, metrics_exporter, migrate
+from metrics import app_info, business_collector, db_up
 from models import DefectCategory, Device, EmailRecipient, User, db
 
 # --------------------------------------------------------------------------- #
@@ -61,6 +63,13 @@ def create_app(config_class=None) -> Flask:
     Mail(app)
     limiter.init_app(app)
 
+    # Prometheus metrics – disabled in test runs to keep the registry clean
+    if not app.config.get("TESTING"):
+        env = os.environ.get("FLASK_ENV", "development")
+        metrics_exporter.init_app(app)
+        app_info.info({"version": "1.0.0", "environment": env})
+        business_collector.init_app(app)
+
     login_manager = LoginManager(app)
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Bitte melden Sie sich an, um fortzufahren."
@@ -107,6 +116,26 @@ def create_app(config_class=None) -> Flask:
     # ---------------------------------------------------------------------- #
     #  Standalone routes                                                       #
     # ---------------------------------------------------------------------- #
+
+    @app.route("/healthz")
+    def healthz():
+        """Liveness + readiness probe.
+
+        Checks DB connectivity and updates the ``redline_db_up`` Prometheus
+        gauge so the health state is always reflected in metrics.
+
+        Returns 200 {"status": "ok"} or 503 {"status": "degraded"}.
+        """
+        try:
+            db.session.execute(text("SELECT 1"))
+            if not app.config.get("TESTING"):
+                db_up.set(1)
+            return jsonify({"status": "ok", "db": "ok"}), 200
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Health check – DB unreachable: %s", exc)
+            if not app.config.get("TESTING"):
+                db_up.set(0)
+            return jsonify({"status": "degraded", "db": "error"}), 503
 
     @app.route("/api/docs")
     def api_docs():
