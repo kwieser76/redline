@@ -163,10 +163,34 @@
       Wenn kein anderer Admin-Account existiert: Redline kurz stoppen, die Datenbank (<code>redline.db</code>) sichern und neu starten – dabei werden die Standard-Zugangsdaten (<code>admin / admin123</code>) wiederhergestellt, sofern die Tabelle leer ist. Danach sofort das Passwort ändern.
     </p>
 
-    <p style="font-weight:700;margin-bottom:4px;">Der Ereignisbericht wird nicht gesendet.</p>
-    <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;">
-      Der Versand von Ereignisberichten per E-Mail erfordert einen konfigurierten SMTP-Server (<code>MAIL_SERVER</code>, <code>MAIL_USERNAME</code>, <code>MAIL_PASSWORD</code> in der <code>.env</code>-Datei).
-      Die normalen Defektmeldungen (via QR-Code) benötigen keinen SMTP-Server – die öffnen den E-Mail-Client des Technikers direkt.
+    <p style="font-weight:700;margin-bottom:4px;">Der Ereignisbericht wird nicht gesendet – es erscheint eine Fehlermeldung.</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 8px 0;">
+      Der Versand von Ereignisberichten per E-Mail erfordert einen konfigurierten SMTP-Server. Die Fehlermeldung erklärt, was genau fehlt:
+    </p>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 16px 0;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--gray-200);">
+          <th style="text-align:left;padding:6px 10px;">Fehlermeldung</th>
+          <th style="text-align:left;padding:6px 10px;">Lösung</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--gray-100);">
+          <td style="padding:8px 10px;"><em>Benutzername oder Passwort … falsch</em></td>
+          <td style="padding:8px 10px;"><code>MAIL_USERNAME</code> und <code>MAIL_PASSWORD</code> in der <code>.env</code>-Datei prüfen und korrekt setzen.</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--gray-100);">
+          <td style="padding:8px 10px;"><em>E-Mail-Server ist nicht erreichbar</em></td>
+          <td style="padding:8px 10px;"><code>MAIL_SERVER</code> und <code>MAIL_PORT</code> prüfen. Standard Gmail: <code>smtp.gmail.com</code> / Port <code>587</code>.</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 10px;"><em>Empfänger-Adresse wurde abgelehnt</em></td>
+          <td style="padding:8px 10px;">Die eingegebene E-Mail-Adresse prüfen – der Server akzeptiert diese Adresse nicht.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:var(--gray-600);margin:0 0 16px 0;">
+      <strong>Hinweis:</strong> Die normalen Defektmeldungen (via QR-Code) benötigen keinen SMTP-Server – diese öffnen den E-Mail-Client des Technikers direkt.
     </p>
 
     <p style="font-weight:700;margin-bottom:4px;">Was bedeutet der Gerätestatus "Wartung"?</p>

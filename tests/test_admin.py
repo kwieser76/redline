@@ -8,7 +8,12 @@ Tests for admin routes:
   /admin/users         User management
   /admin/recipients    E-mail recipient management
   /admin/categories    Defect category management
+  /admin/event-report  Event summary report sending
 """
+import smtplib
+import socket
+from unittest.mock import patch
+
 from models import db, Defect, DefectCategory, Device, EmailRecipient, User
 
 
@@ -440,3 +445,183 @@ class TestCategoryManagement:
         with app.app_context():
             gamma = db.session.get(DefectCategory, gamma_id)
             assert gamma.sort_order > order_before
+
+
+class TestEventReport:
+    """Tests for /admin/event-report – Ereignisbericht senden."""
+
+    _FORM_DATA = {
+        "event_name": "Testfest 2025",
+        "project_number": "PRJ-2025-TEST",
+        "recipient": "empfaenger@example.com",
+    }
+
+    # ------------------------------------------------------------------ #
+    #  Access control                                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_page_renders_for_admin(self, admin_client):
+        resp = admin_client.get("/admin/event-report")
+        assert resp.status_code == 200
+        assert "Ereignisbericht" in resp.data.decode("utf-8")
+
+    def test_redirects_unauthenticated(self, client):
+        resp = client.get("/admin/event-report", follow_redirects=False)
+        assert resp.status_code == 302
+
+    def test_forbidden_for_team_user(self, team_client):
+        resp = team_client.get("/admin/event-report")
+        assert resp.status_code == 403
+
+    # ------------------------------------------------------------------ #
+    #  Validation                                                          #
+    # ------------------------------------------------------------------ #
+
+    def test_all_empty_fields_shows_error(self, admin_client):
+        resp = admin_client.post(
+            "/admin/event-report",
+            data={"event_name": "", "project_number": "", "recipient": ""},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert "erforderlich" in resp.data.decode("utf-8")
+
+    def test_missing_project_number_shows_error(self, admin_client):
+        resp = admin_client.post(
+            "/admin/event-report",
+            data={"event_name": "Testfest", "project_number": "", "recipient": "a@b.de"},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert "erforderlich" in resp.data.decode("utf-8")
+
+    # ------------------------------------------------------------------ #
+    #  Successful send                                                     #
+    # ------------------------------------------------------------------ #
+
+    def test_success_shows_success_message(self, admin_client):
+        resp = admin_client.post(
+            "/admin/event-report",
+            data=self._FORM_DATA,
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert "gesendet" in resp.data.decode("utf-8")
+
+    def test_success_with_existing_defects_shows_count(self, admin_client, defect):
+        resp = admin_client.post(
+            "/admin/event-report",
+            data={
+                "event_name": "Sommerfestival",
+                "project_number": "PRJ-2025-001",
+                "recipient": "empfaenger@example.com",
+            },
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "gesendet" in body
+        assert "1" in body  # 1 Defekt im Bericht
+
+    def test_success_with_no_matching_defects(self, admin_client):
+        """Bericht für unbekanntes Event – 0 Defekte, trotzdem Erfolg."""
+        resp = admin_client.post(
+            "/admin/event-report",
+            data={
+                "event_name": "KeinEvent",
+                "project_number": "PRJ-0000",
+                "recipient": "empfaenger@example.com",
+            },
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "gesendet" in body
+        assert "0" in body
+
+    # ------------------------------------------------------------------ #
+    #  SMTP error messages                                                 #
+    # ------------------------------------------------------------------ #
+
+    def test_smtp_auth_error_shows_credential_hint(self, admin_client):
+        with patch(
+            "routes.admin.send_event_summary_report",
+            side_effect=smtplib.SMTPAuthenticationError(535, b"Auth failed"),
+        ):
+            resp = admin_client.post(
+                "/admin/event-report",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "MAIL_USERNAME" in body
+        assert "MAIL_PASSWORD" in body
+
+    def test_smtp_connect_error_shows_server_hint(self, admin_client):
+        with patch(
+            "routes.admin.send_event_summary_report",
+            side_effect=smtplib.SMTPConnectError(421, b"Connection refused"),
+        ):
+            resp = admin_client.post(
+                "/admin/event-report",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "MAIL_SERVER" in resp.data.decode("utf-8")
+
+    def test_connection_refused_shows_server_hint(self, admin_client):
+        with patch(
+            "routes.admin.send_event_summary_report",
+            side_effect=ConnectionRefusedError(),
+        ):
+            resp = admin_client.post(
+                "/admin/event-report",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "MAIL_SERVER" in resp.data.decode("utf-8")
+
+    def test_gaierror_shows_server_hint(self, admin_client):
+        with patch(
+            "routes.admin.send_event_summary_report",
+            side_effect=socket.gaierror("Name or service not known"),
+        ):
+            resp = admin_client.post(
+                "/admin/event-report",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "MAIL_SERVER" in resp.data.decode("utf-8")
+
+    def test_recipients_refused_shows_recipient_hint(self, admin_client):
+        with patch(
+            "routes.admin.send_event_summary_report",
+            side_effect=smtplib.SMTPRecipientsRefused(
+                {"bad@mail.invalid": (550, b"Refused")}
+            ),
+        ):
+            resp = admin_client.post(
+                "/admin/event-report",
+                data={**self._FORM_DATA, "recipient": "bad@mail.invalid"},
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "abgelehnt" in resp.data.decode("utf-8")
+
+    def test_no_success_flash_on_error(self, admin_client):
+        """Bei SMTP-Fehler darf keine Erfolgsmeldung erscheinen."""
+        with patch(
+            "routes.admin.send_event_summary_report",
+            side_effect=smtplib.SMTPAuthenticationError(535, b"Auth failed"),
+        ):
+            resp = admin_client.post(
+                "/admin/event-report",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        body = resp.data.decode("utf-8")
+        assert "gesendet" not in body

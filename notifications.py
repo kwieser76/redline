@@ -36,39 +36,40 @@ def send_defect_notification(mail, defect: "Defect", device_name: str, workshop_
 
 
 def send_event_summary_report(mail, event_name: str, project_number: str, defects: list, recipient: str) -> None:
-    """Send a post-event summary report with all defects for that event."""
-    try:
-        subject = f"Ereignisbericht: {event_name} (Projekt: {project_number})"
-        if not defects:
-            body = (
-                f"Ereignisbericht für: {event_name} (Projektnummer: {project_number})\n\n"
-                f"Keine Defekte für dieses Event gemeldet.\n"
-            )
-        else:
-            lines = [
-                f"Ereignisbericht für: {event_name} (Projektnummer: {project_number})",
-                f"Anzahl der Defekte: {len(defects)}",
-                "",
-                "=" * 60,
-            ]
-            for i, defect in enumerate(defects, start=1):
-                lines += [
-                    f"\nDefekt #{i}",
-                    f"  Gerät:         {defect.device.name} ({defect.device.device_id})",
-                    f"  Kategorie:     {defect.category}",
-                    f"  Beschreibung:  {defect.description}",
-                    f"  Status:        {defect.status}",
-                    f"  Gemeldet am:   {defect.created_at.strftime('%d.%m.%Y %H:%M')}",
-                ]
-                if defect.resolved_at:
-                    lines.append(
-                        f"  Behoben am:    {defect.resolved_at.strftime('%d.%m.%Y %H:%M')}"
-                    )
-                lines.append("-" * 60)
-            body = "\n".join(lines)
+    """Send a post-event summary report with all defects for that event.
 
-        msg = Message(subject=subject, recipients=[recipient], body=body)
-        mail.send(msg)
-        logger.info("Event summary sent to %s for event '%s'", recipient, event_name)
-    except Exception as exc:
-        logger.error("Failed to send event summary report: %s", exc)
+    Raises any exception from Flask-Mail / smtplib so the caller can show
+    a user-facing error message instead of silently discarding the failure.
+    """
+    subject = f"Ereignisbericht: {event_name} (Projekt: {project_number})"
+    if not defects:
+        body = (
+            f"Ereignisbericht für: {event_name} (Projektnummer: {project_number})\n\n"
+            f"Keine Defekte für dieses Event gemeldet.\n"
+        )
+    else:
+        lines = [
+            f"Ereignisbericht für: {event_name} (Projektnummer: {project_number})",
+            f"Anzahl der Defekte: {len(defects)}",
+            "",
+            "=" * 60,
+        ]
+        for i, defect in enumerate(defects, start=1):
+            lines += [
+                f"\nDefekt #{i}",
+                f"  Gerät:         {defect.device.name} ({defect.device.device_id})",
+                f"  Kategorie:     {defect.category}",
+                f"  Beschreibung:  {defect.description}",
+                f"  Status:        {defect.status}",
+                f"  Gemeldet am:   {defect.created_at.strftime('%d.%m.%Y %H:%M')}",
+            ]
+            if defect.resolved_at:
+                lines.append(
+                    f"  Behoben am:    {defect.resolved_at.strftime('%d.%m.%Y %H:%M')}"
+                )
+            lines.append("-" * 60)
+        body = "\n".join(lines)
+
+    msg = Message(subject=subject, recipients=[recipient], body=body)
+    mail.send(msg)
+    logger.info("Event summary sent to %s for event '%s'", recipient, event_name)
