@@ -17,6 +17,7 @@
   <div class="spacer"></div>
   <a href="{{ url_for('admin.qr_page', device_id=device.device_id) }}" class="btn btn-sm btn-outline">QR-Code</a>
   <a href="{{ url_for('admin.devices') }}" class="btn btn-sm btn-secondary">Alle Geräte</a>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
 </div>
 
 {% if pagination.items %}

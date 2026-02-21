@@ -2,7 +2,11 @@
 {% block title %}Benutzerverwaltung{% endblock %}
 
 {% block content %}
-<div class="section-title">Benutzerverwaltung</div>
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Benutzerverwaltung</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Zurück zum Dashboard</a>
+</div>
 
 <!-- Add user -->
 <div class="card">

@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Hilfe{% endblock %}
+
+{% block content %}
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Hilfe &amp; Bedienungsanleitung</div>
+  <div class="spacer"></div>
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Zurück zum Dashboard</a>
+  {% endif %}
+</div>
+
+<!-- Navigation erklären -->
+<div class="card">
+  <div class="card-title">Navigationsleiste – was bedeutet was?</div>
+  <div class="card-subtitle">Die Leiste oben enthält folgende Elemente:</div>
+  <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:14px;">
+    <thead>
+      <tr style="border-bottom:2px solid var(--gray-200);">
+        <th style="text-align:left;padding:8px 12px;width:160px;">Element</th>
+        <th style="text-align:left;padding:8px 12px;">Bedeutung</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>redline</strong> (Logo)</td>
+        <td style="padding:10px 12px;">Klick bringt Sie jederzeit zurück zur Startseite (Admin-Dashboard).</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Admin</strong></td>
+        <td style="padding:10px 12px;">Link zum Admin-Dashboard – Übersicht aller Verwaltungsbereiche.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>API</strong></td>
+        <td style="padding:10px 12px;">Öffnet die interaktive REST-API-Dokumentation (Swagger UI). Nur für technische Integrationen relevant.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Hilfe</strong></td>
+        <td style="padding:10px 12px;">Diese Seite.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><em>Benutzername</em> <span style="color:var(--gray-500);font-size:12px;">(grau, kein Link)</span></td>
+        <td style="padding:10px 12px;">Zeigt den aktuell angemeldeten Benutzer an – z.&nbsp;B. <code>admin</code> oder <code>team_login</code>. Kein Button, nur eine Information.</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;"><strong>Abmelden</strong></td>
+        <td style="padding:10px 12px;">Beendet die aktuelle Sitzung und leitet zur Login-Seite weiter.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Workflow -->
+<div class="card">
+  <div class="card-title">Wie funktioniert Redline? – Ablauf</div>
+  <ol style="margin:12px 0 0 0;padding-left:22px;line-height:2;font-size:14px;">
+    <li><strong>Gerät anlegen</strong> – Im Admin-Bereich unter <em>Geräteverwaltung</em> ein neues Gerat mit ID und Name erfassen.</li>
+    <li><strong>QR-Code generieren &amp; drucken</strong> – Den erzeugten QR-Code herunterladen und gut sichtbar am Gerät befestigen.</li>
+    <li><strong>Techniker scannt QR-Code</strong> – Mit dem Smartphone-Kamera-App wird der Code gescannt. Der Techniker landet direkt auf dem Defektmeldeformular.</li>
+    <li><strong>Defekt melden</strong> – Techniker wählt Kategorie, gibt eine Beschreibung ein und tippt Event-/Projektnummer ein. Nach dem Absenden öffnet sich der E-Mail-Client automatisch mit einer vorausgefüllten Defektmeldung.</li>
+    <li><strong>E-Mail abschicken</strong> – Techniker tippt auf "Senden" im E-Mail-Client – die Werkstatt erhält die Meldung sofort.</li>
+    <li><strong>Werkstatt repariert</strong> – Das defekte Gerät wird instand gesetzt.</li>
+    <li><strong>Defekt als behoben markieren</strong> – Admin öffnet die Defekthistorie des Geräts und klickt auf "Als behoben markieren". Der Gerätestatus wechselt zurück auf <em>Verfügbar</em>.</li>
+    <li><strong>Ereignisbericht</strong> – Nach einem Event kann der Admin unter <em>Ereignisbericht senden</em> eine Zusammenfassung aller Defekte per E-Mail verschicken.</li>
+  </ol>
+</div>
+
+<!-- Admin-Bereich Übersicht -->
+<div class="card">
+  <div class="card-title">Admin-Bereiche im Überblick</div>
+  <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:14px;">
+    <thead>
+      <tr style="border-bottom:2px solid var(--gray-200);">
+        <th style="text-align:left;padding:8px 12px;width:220px;">Bereich</th>
+        <th style="text-align:left;padding:8px 12px;">Was kann ich hier tun?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Dashboard</strong></td>
+        <td style="padding:10px 12px;">Startseite mit Schnellzugriff auf alle Bereiche und einer Zusammenfassung (Anzahl Geräte, offene Defekte, aktive Events).</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Geräteverwaltung</strong></td>
+        <td style="padding:10px 12px;">Geräte anlegen und löschen, QR-Codes generieren und herunterladen, Gerätestatus einsehen.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Alle Defekte</strong></td>
+        <td style="padding:10px 12px;">Alle gemeldeten Defekte aller Geräte, filterbar nach Status (Offen / Behoben) und Event-/Projektnummer.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Defekthistorie</strong> <span style="color:var(--gray-500);font-size:12px;">(pro Gerät)</span></td>
+        <td style="padding:10px 12px;">Alle Defektmeldungen eines einzelnen Geräts in chronologischer Reihenfolge. Hier können Defekte als behoben markiert werden.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>E-Mail-Empfänger</strong></td>
+        <td style="padding:10px 12px;">Verwalten, welche E-Mail-Adressen Defektmeldungen erhalten. Empfänger können einzeln aktiviert oder deaktiviert werden.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Defektkategorien</strong></td>
+        <td style="padding:10px 12px;">Kategorien im Dropdown des Meldeformulars verwalten (hinzufügen, löschen, Reihenfolge ändern).</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Benutzerverwaltung</strong></td>
+        <td style="padding:10px 12px;">Admin- und Techniker-Accounts anlegen, Passwörter ändern, Accounts löschen.</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;"><strong>Ereignisbericht senden</strong></td>
+        <td style="padding:10px 12px;">Nach einem Event eine Zusammenfassung aller gemeldeten Defekte als E-Mail verschicken. Bekannte Events können per Klick in das Formular übernommen werden.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Rollen -->
+<div class="card">
+  <div class="card-title">Benutzerrollen</div>
+  <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:14px;">
+    <thead>
+      <tr style="border-bottom:2px solid var(--gray-200);">
+        <th style="text-align:left;padding:8px 12px;width:160px;">Rolle</th>
+        <th style="text-align:left;padding:8px 12px;">Zugang</th>
+        <th style="text-align:left;padding:8px 12px;">Typisches Gerät</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Administrator</strong></td>
+        <td style="padding:10px 12px;">Vollzugriff auf alle Admin-Bereiche und die API.</td>
+        <td style="padding:10px 12px;">PC / Laptop</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;"><strong>Gemeinschaftsuser</strong> <span style="color:var(--gray-500);font-size:12px;">(team_login)</span></td>
+        <td style="padding:10px 12px;">Zugriff nur auf das Defektmeldeformular (via QR-Code-Link). Kein Admin-Bereich.</td>
+        <td style="padding:10px 12px;">Smartphone / iPhone</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px;color:var(--gray-600);margin-top:14px;">
+    <strong>Hinweis:</strong> Das Passwort von <code>team_login</code> wird von allen Technikern geteilt.
+    Es sollte regelmässig erneuert werden (Admin → Benutzerverwaltung → Passwort ändern).
+  </p>
+</div>
+
+<!-- FAQ -->
+<div class="card">
+  <div class="card-title">Häufige Fragen</div>
+
+  <div style="margin-top:14px;">
+    <p style="font-weight:700;margin-bottom:4px;">Die QR-Codes führen auf "localhost" – das iPhone kann die Seite nicht öffnen.</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;">
+      In der Konfigurationsdatei (<code>.env</code>) muss <code>APP_BASE_URL</code> auf die IP-Adresse des Computers gesetzt sein, auf dem Redline läuft – z.&nbsp;B. <code>http://192.168.178.133:5000</code>.
+      Nach der Änderung muss die App neu gestartet und ein neuer QR-Code heruntergeladen werden.
+    </p>
+
+    <p style="font-weight:700;margin-bottom:4px;">Das iPhone kann die App nicht erreichen.</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;">
+      iPhone und Computer müssen im selben WLAN-Netzwerk sein. Unter Windows muss zusätzlich Port 5000 in der Firewall freigegeben werden (siehe Installations-Anleitung, Schritt&nbsp;9).
+    </p>
+
+    <p style="font-weight:700;margin-bottom:4px;">Ich habe das Admin-Passwort vergessen.</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;">
+      Wenn kein anderer Admin-Account existiert: Redline kurz stoppen, die Datenbank (<code>redline.db</code>) sichern und neu starten – dabei werden die Standard-Zugangsdaten (<code>admin / admin123</code>) wiederhergestellt, sofern die Tabelle leer ist. Danach sofort das Passwort ändern.
+    </p>
+
+    <p style="font-weight:700;margin-bottom:4px;">Der Ereignisbericht wird nicht gesendet.</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;">
+      Der Versand von Ereignisberichten per E-Mail erfordert einen konfigurierten SMTP-Server (<code>MAIL_SERVER</code>, <code>MAIL_USERNAME</code>, <code>MAIL_PASSWORD</code> in der <code>.env</code>-Datei).
+      Die normalen Defektmeldungen (via QR-Code) benötigen keinen SMTP-Server – die öffnen den E-Mail-Client des Technikers direkt.
+    </p>
+
+    <p style="font-weight:700;margin-bottom:4px;">Was bedeutet der Gerätestatus "Wartung"?</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 4px 0;">
+      Sobald ein Defekt für ein Gerät gemeldet wird, wechselt dessen Status automatisch auf <em>Wartung</em>. Der Status wird nur im Redline-System gezeigt – er hat keine Verbindung zu externen Systemen. Erst wenn der Defekt als behoben markiert wird, springt der Status wieder auf <em>Verfügbar</em>.
+    </p>
+  </div>
+</div>
+
+{% endblock %}

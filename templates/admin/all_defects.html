@@ -2,7 +2,11 @@
 {% block title %}Alle Defekte{% endblock %}
 
 {% block content %}
-<div class="section-title">Alle Defekte</div>
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Alle Defekte</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Zurück zum Dashboard</a>
+</div>
 
 <!-- Filters -->
 <div class="card">
