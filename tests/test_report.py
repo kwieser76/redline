@@ -3,6 +3,10 @@ Tests for defect report routes:
   GET/POST /report/<device_id>
   GET      /report/<device_id>/success
 """
+from unittest.mock import patch
+
+from sqlalchemy.exc import OperationalError
+
 from models import Defect, Device
 
 
@@ -172,4 +176,49 @@ class TestDefectSuccess:
 
     def test_success_page_shows_device_name(self, admin_client, defect, device):
         resp = admin_client.get(f"/report/{defect['device_id']}/success")
+        assert device["name"].encode() in resp.data
+
+
+class TestDefectFormDatabaseErrors:
+    """DB-Commit-Fehler bei der Defektmeldung zeigen verständliche Meldung."""
+
+    _DB_ERROR = OperationalError("db error", {}, Exception("connection lost"))
+    _FORM_DATA = {
+        "category": "Mechanischer Schaden",
+        "description": "Testschaden",
+        "event_name": "Testfest",
+        "project_number": "PRJ-001",
+    }
+
+    def test_db_error_shows_flash_message(self, admin_client, device):
+        with patch("routes.report.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                f"/report/{device['device_id']}",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "konnte nicht gespeichert werden" in body
+
+    def test_db_error_does_not_show_success(self, admin_client, device):
+        with patch("routes.report.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                f"/report/{device['device_id']}",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        body = resp.data.decode("utf-8")
+        assert "erfolgreich" not in body
+
+    def test_db_error_re_renders_form_with_data(self, admin_client, device):
+        """Nach DB-Fehler wird das Formular mit den eingegebenen Daten erneut angezeigt."""
+        with patch("routes.report.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                f"/report/{device['device_id']}",
+                data=self._FORM_DATA,
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        # The form should be rendered (not a redirect to success)
         assert device["name"].encode() in resp.data

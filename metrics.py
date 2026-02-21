@@ -13,6 +13,8 @@ Usage in create_app():
     app_info.info({"version": "1.0", "env": env})
 """
 
+import logging
+
 from prometheus_client import Gauge, Info, REGISTRY
 from prometheus_client.core import GaugeMetricFamily
 
@@ -160,7 +162,10 @@ class _BusinessCollector:
 
         except Exception:
             # Collector must never crash Prometheus scrape.
-            pass
+            logging.getLogger(__name__).error(
+                "Business metrics collection failed – returning empty metrics.",
+                exc_info=True,
+            )
 
 
 # Singleton – imported and wired by app.py

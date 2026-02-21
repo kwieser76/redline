@@ -2,6 +2,10 @@
 Tests for the REST JSON API (v1).
 All endpoints require HTTP Basic Auth.
 """
+from unittest.mock import patch
+
+from sqlalchemy.exc import OperationalError
+
 from models import db, Defect, Device
 
 
@@ -418,3 +422,65 @@ class TestAPIEvents:
     def test_team_user_can_list_events(self, client, team_headers, defect):
         resp = client.get("/api/v1/events", headers=team_headers)
         assert resp.status_code == 200
+
+
+class TestAPIDatabaseErrors:
+    """DB-Commit-Fehler geben JSON-Fehlermeldung statt 500-HTML zurück."""
+
+    _DB_ERROR = OperationalError("db error", {}, Exception("connection lost"))
+
+    def test_create_device_db_error_returns_500_json(self, client, admin_headers):
+        with patch("api.db.session.commit", side_effect=self._DB_ERROR):
+            resp = client.post(
+                "/api/v1/devices",
+                json={"device_id": "ERR-001", "name": "ErrDevice"},
+                headers=admin_headers,
+            )
+        assert resp.status_code == 500
+        assert "error" in resp.json
+        assert "Database error" in resp.json["error"]
+
+    def test_update_device_db_error_returns_500_json(self, client, admin_headers, device):
+        with patch("api.db.session.commit", side_effect=self._DB_ERROR):
+            resp = client.patch(
+                f"/api/v1/devices/{device['device_id']}",
+                json={"name": "New Name"},
+                headers=admin_headers,
+            )
+        assert resp.status_code == 500
+        assert "Database error" in resp.json["error"]
+
+    def test_delete_device_db_error_returns_500_json(self, client, admin_headers, device):
+        with patch("api.db.session.commit", side_effect=self._DB_ERROR):
+            resp = client.delete(
+                f"/api/v1/devices/{device['device_id']}",
+                headers=admin_headers,
+            )
+        assert resp.status_code == 500
+        assert "Database error" in resp.json["error"]
+
+    def test_create_defect_db_error_returns_500_json(self, client, admin_headers, device):
+        with patch("api.db.session.commit", side_effect=self._DB_ERROR):
+            resp = client.post(
+                "/api/v1/defects",
+                json={
+                    "device_id": device["device_id"],
+                    "category": "Mechanischer Schaden",
+                    "description": "Test",
+                    "event_name": "Event",
+                    "project_number": "PRJ-001",
+                },
+                headers=admin_headers,
+            )
+        assert resp.status_code == 500
+        assert "Database error" in resp.json["error"]
+
+    def test_resolve_defect_db_error_returns_500_json(self, client, admin_headers, defect):
+        with patch("api.db.session.commit", side_effect=self._DB_ERROR):
+            resp = client.patch(
+                f"/api/v1/defects/{defect['id']}/resolve",
+                json={},
+                headers=admin_headers,
+            )
+        assert resp.status_code == 500
+        assert "Database error" in resp.json["error"]

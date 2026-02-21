@@ -14,6 +14,8 @@ import smtplib
 import socket
 from unittest.mock import patch
 
+from sqlalchemy.exc import OperationalError
+
 from models import db, Defect, DefectCategory, Device, EmailRecipient, User
 
 
@@ -625,3 +627,115 @@ class TestEventReport:
             )
         body = resp.data.decode("utf-8")
         assert "gesendet" not in body
+
+
+class TestDatabaseErrorHandling:
+    """DB-Commit-Fehler zeigen verständliche Meldung statt 500."""
+
+    _DB_ERROR = OperationalError("db error", {}, Exception("connection lost"))
+
+    def test_add_device_db_error_shows_flash(self, admin_client):
+        with patch("routes.admin.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                "/admin/devices",
+                data={"action": "add", "device_id": "ERR-001", "name": "ErrDevice"},
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "Speichern fehlgeschlagen" in body
+
+    def test_delete_device_db_error_shows_flash(self, app, admin_client, device):
+        with patch("routes.admin.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                "/admin/devices",
+                data={"action": "delete", "dev_id": device["id"]},
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "Speichern fehlgeschlagen" in resp.data.decode("utf-8")
+
+    def test_add_user_db_error_shows_flash(self, admin_client):
+        with patch("routes.admin.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                "/admin/users",
+                data={"action": "add", "username": "erruser", "password": "password123"},
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "Speichern fehlgeschlagen" in resp.data.decode("utf-8")
+
+    def test_add_recipient_db_error_shows_flash(self, admin_client):
+        with patch("routes.admin.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                "/admin/recipients",
+                data={"action": "add", "name": "ErrRec", "email": "err@example.com"},
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "Speichern fehlgeschlagen" in resp.data.decode("utf-8")
+
+    def test_add_category_db_error_shows_flash(self, admin_client):
+        with patch("routes.admin.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                "/admin/categories",
+                data={"action": "add", "name": "ErrKategorie"},
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "Speichern fehlgeschlagen" in resp.data.decode("utf-8")
+
+    def test_mark_repaired_db_error_shows_flash(self, admin_client, defect):
+        with patch("routes.admin.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                f"/admin/repair/{defect['id']}",
+                data={"resolution_notes": "test"},
+                follow_redirects=True,
+            )
+        assert resp.status_code == 200
+        assert "Speichern fehlgeschlagen" in resp.data.decode("utf-8")
+
+    def test_no_success_flash_on_db_error(self, admin_client):
+        """Bei DB-Fehler darf keine Erfolgsmeldung erscheinen."""
+        with patch("routes.admin.db.session.commit", side_effect=self._DB_ERROR):
+            resp = admin_client.post(
+                "/admin/devices",
+                data={"action": "add", "device_id": "ERR-002", "name": "ErrDev"},
+                follow_redirects=True,
+            )
+        body = resp.data.decode("utf-8")
+        assert "wurde angelegt" not in body
+
+
+class TestEmailValidation:
+    """E-Mail-Format-Validierung für Empfänger."""
+
+    def test_invalid_email_without_at_shows_error(self, admin_client):
+        resp = admin_client.post(
+            "/admin/recipients",
+            data={"action": "add", "name": "Test", "email": "keineemail"},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "ltige E-Mail" in body  # "gültige E-Mail"
+
+    def test_invalid_email_without_domain_shows_error(self, admin_client):
+        resp = admin_client.post(
+            "/admin/recipients",
+            data={"action": "add", "name": "Test", "email": "user@"},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "ltige E-Mail" in body
+
+    def test_valid_email_is_accepted(self, app, admin_client):
+        resp = admin_client.post(
+            "/admin/recipients",
+            data={"action": "add", "name": "Gültig", "email": "valid@example.com"},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "ltige E-Mail" not in body

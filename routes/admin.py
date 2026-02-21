@@ -5,6 +5,8 @@ All routes require is_admin=True (enforced by the admin_required decorator).
 """
 
 import io
+import logging
+import re
 import smtplib
 import socket
 from datetime import datetime, timezone
@@ -24,11 +26,44 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from flask_mail import Mail
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from models import Defect, DefectCategory, Device, EmailRecipient, User, db
 from notifications import send_event_summary_report
 
+logger = logging.getLogger(__name__)
+
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+
+def _safe_commit(success_msg: str | None = None) -> bool:
+    """Commit the current DB session with user-friendly error handling.
+
+    Returns True on success, False on failure (session is rolled back and
+    a flash message is shown).
+    """
+    try:
+        db.session.commit()
+        if success_msg:
+            flash(success_msg, "success")
+        return True
+    except IntegrityError:
+        db.session.rollback()
+        flash(
+            "Speichern fehlgeschlagen: Ein Datensatz mit diesen Werten "
+            "existiert bereits.",
+            "danger",
+        )
+        return False
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("Database commit failed: %s", exc)
+        flash(
+            "Speichern fehlgeschlagen: Die Datenbank hat einen Fehler gemeldet. "
+            "Bitte versuchen Sie es erneut oder kontaktieren Sie den Administrator.",
+            "danger",
+        )
+        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -93,16 +128,14 @@ def devices():
                     device_id=device_id, name=name, description=description
                 )
                 db.session.add(device)
-                db.session.commit()
-                flash(f"Gerät '{name}' wurde angelegt.", "success")
+                _safe_commit(f"Gerät '{name}' wurde angelegt.")
 
         elif action == "delete":
             dev_id = request.form.get("dev_id", type=int)
             device = db.session.get(Device, dev_id)
             if device:
                 db.session.delete(device)
-                db.session.commit()
-                flash("Gerät gelöscht.", "success")
+                _safe_commit("Gerät gelöscht.")
 
     all_devices = Device.query.order_by(Device.name).all()
     return render_template("admin/devices.html", devices=all_devices)
@@ -172,8 +205,7 @@ def mark_repaired(defect_id: int):
     if open_defects == 0:
         device.status = "Verfügbar"
 
-    db.session.commit()
-    flash("Defekt als behoben markiert.", "success")
+    _safe_commit("Defekt als behoben markiert.")
     return redirect(url_for("admin.device_history", device_id=device.device_id))
 
 
@@ -202,16 +234,14 @@ def users():
                 user = User(username=username, is_admin=is_admin)
                 user.set_password(password)
                 db.session.add(user)
-                db.session.commit()
-                flash(f"Benutzer '{username}' wurde angelegt.", "success")
+                _safe_commit(f"Benutzer '{username}' wurde angelegt.")
 
         elif action == "delete":
             user_id = request.form.get("user_id", type=int)
             user = db.session.get(User, user_id)
             if user and user.username != "admin" and user.id != current_user.id:
                 db.session.delete(user)
-                db.session.commit()
-                flash("Benutzer gelöscht.", "success")
+                _safe_commit("Benutzer gelöscht.")
             else:
                 flash("Dieser Benutzer kann nicht gelöscht werden.", "danger")
 
@@ -227,9 +257,8 @@ def users():
                     )
                 else:
                     user.set_password(new_password)
-                    db.session.commit()
-                    flash(
-                        f"Passwort für '{user.username}' wurde geändert.", "success"
+                    _safe_commit(
+                        f"Passwort für '{user.username}' wurde geändert."
                     )
 
     all_users = User.query.order_by(User.username).all()
@@ -359,30 +388,33 @@ def recipients():
             email = request.form.get("email", "").strip().lower()
             if not name or not email:
                 flash("Name und E-Mail-Adresse sind erforderlich.", "danger")
+            elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+                flash(
+                    "Bitte geben Sie eine gültige E-Mail-Adresse ein "
+                    "(z.\u202fB. name@example.com).",
+                    "danger",
+                )
             elif EmailRecipient.query.filter_by(email=email).first():
                 flash(f"E-Mail '{email}' ist bereits eingetragen.", "danger")
             else:
                 rec = EmailRecipient(name=name, email=email)
                 db.session.add(rec)
-                db.session.commit()
-                flash(f"Empfänger '{name}' wurde hinzugefügt.", "success")
+                _safe_commit(f"Empfänger '{name}' wurde hinzugefügt.")
 
         elif action == "delete":
             rec_id = request.form.get("rec_id", type=int)
             rec = db.session.get(EmailRecipient, rec_id)
             if rec:
                 db.session.delete(rec)
-                db.session.commit()
-                flash(f"Empfänger '{rec.name}' wurde gelöscht.", "success")
+                _safe_commit(f"Empfänger '{rec.name}' wurde gelöscht.")
 
         elif action == "toggle":
             rec_id = request.form.get("rec_id", type=int)
             rec = db.session.get(EmailRecipient, rec_id)
             if rec:
                 rec.active = not rec.active
-                db.session.commit()
                 state = "aktiviert" if rec.active else "deaktiviert"
-                flash(f"Empfänger '{rec.name}' wurde {state}.", "success")
+                _safe_commit(f"Empfänger '{rec.name}' wurde {state}.")
 
     all_recipients = EmailRecipient.query.order_by(EmailRecipient.name).all()
     return render_template("admin/recipients.html", recipients=all_recipients)
@@ -412,16 +444,14 @@ def categories():
                 )
                 cat = DefectCategory(name=name, sort_order=max_order + 1)
                 db.session.add(cat)
-                db.session.commit()
-                flash(f"Kategorie '{name}' wurde angelegt.", "success")
+                _safe_commit(f"Kategorie '{name}' wurde angelegt.")
 
         elif action == "delete":
             cat_id = request.form.get("cat_id", type=int)
             cat = db.session.get(DefectCategory, cat_id)
             if cat:
                 db.session.delete(cat)
-                db.session.commit()
-                flash(f"Kategorie '{cat.name}' wurde gelöscht.", "success")
+                _safe_commit(f"Kategorie '{cat.name}' wurde gelöscht.")
 
         elif action == "move_up":
             _move_category(request.form.get("cat_id", type=int), direction="up")
@@ -449,7 +479,7 @@ def _move_category(cat_id: int, direction: str) -> None:
         cats[swap_idx].sort_order,
         cats[idx].sort_order,
     )
-    db.session.commit()
+    _safe_commit()
 
 
 # --------------------------------------------------------------------------- #

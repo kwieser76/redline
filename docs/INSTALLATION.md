@@ -935,13 +935,29 @@ Ensure `RATELIMIT_ENABLED=False` is set in `TestConfig` (already done). Do not r
 
 ### Email not sending
 
-- Check `MAIL_SERVER`, `MAIL_USERNAME`, `MAIL_PASSWORD` in `.env`
-- For Gmail: use an **App Password** (not your account password)
+The application shows specific error messages in the UI when email delivery fails:
+
+| Error message | Cause | Fix |
+|---------------|-------|-----|
+| *Benutzername oder Passwort … falsch* | SMTP authentication failed | Check `MAIL_USERNAME` and `MAIL_PASSWORD` in `.env`. For Gmail use an **App Password** (not your account password). |
+| *E-Mail-Server ist nicht erreichbar* | Cannot connect to the SMTP server | Check `MAIL_SERVER` and `MAIL_PORT` in `.env`. Default Gmail: `smtp.gmail.com` / `587`. |
+| *Empfänger-Adresse wurde abgelehnt* | SMTP server rejected the recipient | Verify the recipient email address is valid and accepts mail. |
+
 - Note: SMTP is only needed for **Event Summary Reports**. Defect notifications use `mailto:` links (no SMTP required).
 
 ### FileMaker sync failing
 
 If `FILEMAKER_PASSWORD` is empty the client runs in **POC mode** (logs what would be sent, no network calls). Check the log for `[POC]` prefixed lines to verify.
+
+### "Speichern fehlgeschlagen" in admin UI
+
+All database write operations (adding devices, users, recipients, categories, resolving defects) now show a user-friendly error message instead of a 500 error page when the commit fails. Common causes:
+
+- **Duplicate entry** – a device ID or email that already exists
+- **Database locked** – another process is writing to the SQLite file (see below)
+- **Disk full** – the server has no free disk space
+
+Details are always logged to the server log.
 
 ### Database locked (SQLite)
 

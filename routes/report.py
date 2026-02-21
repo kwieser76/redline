@@ -7,6 +7,7 @@ Mobile-first flow:
   GET  /report/<device_id>/success  – confirmation page with mailto: link
 """
 
+import logging
 import urllib.parse
 
 from flask import (
@@ -18,8 +19,11 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from models import Defect, DefectCategory, Device, EmailRecipient, db
+
+logger = logging.getLogger(__name__)
 
 report_bp = Blueprint("report", __name__, url_prefix="/report")
 
@@ -83,7 +87,22 @@ def defect_form(device_id: str):
         )
         db.session.add(defect)
         device.status = "Wartung"
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError as exc:
+            db.session.rollback()
+            logger.error("Failed to save defect report: %s", exc)
+            flash(
+                "Die Defektmeldung konnte nicht gespeichert werden. "
+                "Bitte versuchen Sie es erneut.",
+                "danger",
+            )
+            return render_template(
+                "report_defect.html",
+                device=device,
+                categories=categories,
+                form_data=request.form,
+            )
 
         flash("Defekt erfolgreich gemeldet.", "success")
         return redirect(url_for("report.defect_success", device_id=device.device_id))

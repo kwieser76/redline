@@ -193,6 +193,19 @@
       <strong>Hinweis:</strong> Die normalen Defektmeldungen (via QR-Code) benötigen keinen SMTP-Server – diese öffnen den E-Mail-Client des Technikers direkt.
     </p>
 
+    <p style="font-weight:700;margin-bottom:4px;">Es erscheint "Speichern fehlgeschlagen" – was tun?</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 8px 0;">
+      Diese Meldung erscheint, wenn die Datenbank eine Änderung nicht übernehmen konnte. Mögliche Ursachen:
+    </p>
+    <ul style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;padding-left:22px;">
+      <li><strong>Doppelter Eintrag</strong> – z.&nbsp;B. eine Geräte-ID oder E-Mail-Adresse, die bereits existiert.</li>
+      <li><strong>Datenbankdatei gesperrt</strong> – ein anderer Prozess greift gerade auf <code>redline.db</code> zu. Bitte kurz warten und erneut versuchen.</li>
+      <li><strong>Festplatte voll</strong> – auf dem Server steht kein Speicherplatz mehr zur Verfügung.</li>
+    </ul>
+    <p style="font-size:13px;color:var(--gray-600);margin:0 0 16px 0;">
+      Falls das Problem bestehen bleibt, finden Sie Details im Server-Log (<code>gunicorn.log</code> bzw. die Terminal-Ausgabe).
+    </p>
+
     <p style="font-weight:700;margin-bottom:4px;">Was bedeutet der Gerätestatus "Wartung"?</p>
     <p style="font-size:14px;color:var(--gray-700);margin:0 0 4px 0;">
       Sobald ein Defekt für ein Gerät gemeldet wird, wechselt dessen Status automatisch auf <em>Wartung</em>. Der Status wird nur im Redline-System gezeigt – er hat keine Verbindung zu externen Systemen. Erst wenn der Defekt als behoben markiert wird, springt der Status wieder auf <em>Verfügbar</em>.
