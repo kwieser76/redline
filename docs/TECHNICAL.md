@@ -23,6 +23,7 @@
 13. [Testing Strategy](#13-testing-strategy)
 14. [Deployment Architecture](#14-deployment-architecture)
 15. [Non-Functional Requirements](#15-non-functional-requirements)
+16. [Observability](#16-observability)
 
 ---
 
@@ -34,31 +35,30 @@ Redline is a **mobile-first, QR-code-based defect reporting system** for event e
 ┌─────────────────────────────────────────────────────────────┐
 │                        USERS                                │
 │                                                             │
-│  Technician (iPhone)          Admin (PC-Browser)            │
-│  ┌──────────────────┐         ┌──────────────────────────┐  │
-│  │  Scan QR Code    │         │   Admin Dashboard        │  │
-│  │  Fill Form       │         │   Manage Devices/Users   │  │
-│  │  Send mailto:    │         │   View/Resolve Defects   │  │
-│  └────────┬─────────┘         └────────────┬─────────────┘  │
-└───────────┼──────────────────────────────────┼──────────────┘
-            │ HTTPS                            │ HTTPS
-            ▼                                  ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Flask Application                        │
-│                                                             │
-│   routes/report.py   routes/admin.py   routes/auth.py      │
-│   api.py (REST v1)   app.py (factory)  config.py           │
-│   models.py          notifications.py  filemaker.py        │
-│                                                             │
-│                  SQLAlchemy ORM                             │
-│                        │                                   │
-│              ┌─────────┴─────────┐                         │
-│          SQLite (dev)      PostgreSQL (prod)                │
-└─────────────────────────────────────────────────────────────┘
-            │                          │
-            ▼                          ▼
-    FileMaker Data API          SMTP Mail Server
-    (optional, non-blocking)    (optional, event reports)
+│  Technician (iPhone)    Admin (PC-Browser)  Ops (Browser)  │
+│  ┌──────────────────┐   ┌────────────────┐  ┌────────────┐ │
+│  │  Scan QR Code    │   │ Admin Dashboard│  │  Grafana   │ │
+│  │  Fill Form       │   │ Manage Devices │  │ Dashboard  │ │
+│  │  Send mailto:    │   │ Resolve Defects│  │            │ │
+│  └────────┬─────────┘   └──────┬─────────┘  └─────┬──────┘ │
+└───────────┼────────────────────┼─────────────────┼────────┘
+            │ HTTPS              │ HTTPS            │ HTTP
+            ▼                    ▼                  ▼
+┌─────────────────────────┐   ┌─────────┐  ┌────────────────┐
+│    Flask Application    │   │Prometheus│  │    Grafana     │
+│                         │◄──│ scrapes │  │ (provisioned)  │
+│  /healthz  /metrics     │   │/metrics │  └────────┬───────┘
+│  routes/   api.py       │   │every 15s│           │
+│  models.py metrics.py   │   └─────────┘           │ pulls
+│       │                 │        ▲                 │
+│   SQLAlchemy ORM        │        └─────────────────┘
+│       │                 │
+│  SQLite / PostgreSQL    │
+└─────────────────────────┘
+       │                │
+       ▼                ▼
+FileMaker API      SMTP Server
+(optional)         (optional)
 ```
 
 ---
@@ -67,9 +67,10 @@ Redline is a **mobile-first, QR-code-based defect reporting system** for event e
 
 ```
 Redline-/
-├── app.py                  # App factory (create_app), seed, error handlers
+├── app.py                  # App factory (create_app), seed, error handlers, /healthz
 ├── config.py               # DevelopmentConfig / ProductionConfig / TestConfig
-├── extensions.py           # Shared Flask-Limiter + Flask-Migrate instances
+├── extensions.py           # Shared Flask-Limiter, Flask-Migrate, PrometheusMetrics
+├── metrics.py              # Prometheus gauges + lazy business metric collector
 ├── models.py               # SQLAlchemy ORM models + db instance
 ├── api.py                  # REST API blueprint (/api/v1/*)
 ├── notifications.py        # Email helpers (defect notification, event report)
@@ -77,8 +78,18 @@ Redline-/
 ├── requirements.txt        # Pinned production dependencies
 ├── requirements-test.txt   # Test-only additions (pytest, coverage)
 ├── Dockerfile              # Multi-stage production image
-├── docker-compose.yml      # Docker Compose deployment
+├── docker-compose.yml      # Docker Compose: redline + prometheus + grafana
 ├── .env.example            # Environment variable template
+│
+├── prometheus/
+│   └── prometheus.yml      # Prometheus scrape config (15s interval, 30d retention)
+│
+├── grafana/
+│   ├── provisioning/
+│   │   ├── datasources/prometheus.yml   # Auto-wired Prometheus datasource
+│   │   └── dashboards/dashboard.yml     # Dashboard folder provider config
+│   └── dashboards/
+│       └── redline.json    # Operations dashboard (4 rows, 16 panels)
 │
 ├── routes/                 # Web UI blueprints
 │   ├── __init__.py
@@ -349,6 +360,8 @@ See [Section 11](#11-rate-limiting).
 |-------|---------|
 | `GET /` | Redirects based on user role |
 | `GET /api/docs` | Swagger UI |
+| `GET /healthz` | Liveness + readiness probe (DB check, updates `redline_db_up`) |
+| `GET /metrics` | Prometheus scrape endpoint *(non-TESTING mode only)* |
 
 ---
 
@@ -485,20 +498,22 @@ In Docker, logs are written to stdout/stderr and captured by the Docker logging 
 ### Test Pyramid
 
 ```
-        ┌─────────────────┐
-        │  test_business  │  End-to-end workflow tests
-        │  (10+ scenarios)│
-        ├─────────────────┤
-        │   test_nfr      │  Non-functional: security, perf, integrity
-        │   (30+ tests)   │
-        ├─────────────────┤
-        │  test_api       │  REST API contract tests (80+ tests)
-        │  test_admin     │  Admin route tests
-        │  test_report    │  Defect form tests
-        │  test_auth      │  Auth flow tests
-        ├─────────────────┤
-        │  test_models    │  ORM unit tests (35 tests)
-        └─────────────────┘
+        ┌──────────────────────┐
+        │   test_business      │  End-to-end workflow tests (BW-01…10)
+        │   (50+ tests)        │
+        ├──────────────────────┤
+        │   test_nfr           │  Security, performance, DB integrity
+        │   test_observability │  /healthz, collector, gauges, isolation
+        │   (80+ tests)        │
+        ├──────────────────────┤
+        │   test_api           │  REST API contract (80+ tests)
+        │   test_admin         │  Admin route tests
+        │   test_report        │  Defect form tests
+        │   test_auth          │  Auth flow tests
+        │   test_notifications │  Email send tests
+        ├──────────────────────┤
+        │   test_models        │  ORM unit tests (35 tests)
+        └──────────────────────┘
 ```
 
 ### Key Design Decisions
@@ -545,14 +560,26 @@ python app.py          # Flask built-in dev server, port 5000
 docker compose up -d
 
 Nginx (reverse proxy, TLS termination)
-  └── gunicorn (WSGI, 2 workers × 4 threads)
+  └── gunicorn (WSGI, 2 workers × 4 threads)         :8000
         └── Flask app (create_app())
+              ├── /healthz  (liveness probe)
+              ├── /metrics  (Prometheus scrape target)
               └── SQLite on named Docker volume  (/app/data/redline.db)
+
+Prometheus :9090
+  └── scrapes Flask /metrics every 15 s
+        └── stores TSDB in prometheus_data volume (30-day retention)
+
+Grafana :3000
+  └── reads from Prometheus (auto-provisioned datasource)
+        └── serves "Redline Operations Dashboard" (auto-provisioned)
 ```
 
 Multi-stage Dockerfile:
 1. **builder** – installs Python deps into `/opt/venv`
 2. **runtime** – copies only the venv + app code; runs as non-root user `redline`
+
+Named volumes: `redline_data`, `redline_qrcodes`, `prometheus_data`, `grafana_data`
 
 ### Production (Bare Metal with Nginx)
 
@@ -591,4 +618,141 @@ Set `RATELIMIT_STORAGE_URL=redis://localhost:6379/0` when running multiple gunic
 | NFR-12 | Observability | Structured log format with timestamps | `logging.basicConfig` |
 | NFR-13 | Config | Production startup validation (fail-fast) | `ProductionConfig.validate()` |
 | NFR-14 | Deployment | Non-root Docker user | `useradd redline` in Dockerfile |
-| NFR-15 | Deployment | Docker health check | `HEALTHCHECK` in Dockerfile |
+| NFR-15 | Deployment | Docker health check | `HEALTHCHECK` in Dockerfile → `/healthz` |
+| NFR-16 | Observability | Prometheus metrics endpoint exposed | `prometheus-flask-exporter` → `/metrics` |
+| NFR-17 | Observability | Business metrics queryable in real time | `metrics.py` – lazy DB collector |
+| NFR-18 | Observability | Operations dashboard zero-config | Grafana auto-provisioning |
+| NFR-19 | Observability | Liveness/readiness probe with DB check | `GET /healthz` → 200 / 503 |
+
+---
+
+## 16. Observability
+
+### Architecture
+
+The observability stack runs as three Docker Compose services and requires zero manual configuration:
+
+```
+Flask (:8000)
+  ├── GET /healthz        Liveness + readiness probe (JSON, no auth)
+  └── GET /metrics        Prometheus text format (auto-instrumented routes + business metrics)
+
+Prometheus (:9090)
+  └── scrapes /metrics every 15 s
+  └── retains 30 days of TSDB data
+
+Grafana (:3000)
+  └── datasource: Prometheus (auto-provisioned via YAML)
+  └── dashboard:  redline.json (auto-provisioned, default home page)
+```
+
+### /healthz Endpoint
+
+| Attribute | Value |
+|-----------|-------|
+| Method | `GET` |
+| Auth | None (public) |
+| Success | `200 {"status": "ok", "db": "ok"}` |
+| Degraded | `503 {"status": "degraded", "db": "error"}` |
+| Side effect | Sets `redline_db_up` gauge to 1 or 0 |
+
+Used by Docker `HEALTHCHECK`, load balancers, and Prometheus alert rules.
+
+### Prometheus Metrics
+
+#### HTTP Metrics (auto-instrumented)
+
+| Metric | Type | Labels |
+|--------|------|--------|
+| `flask_http_request_total` | Counter | `method`, `path`, `status` |
+| `flask_http_request_duration_seconds` | Histogram | `method`, `path`, `status` |
+| `flask_http_request_exceptions_total` | Counter | `method`, `path` |
+| `process_resident_memory_bytes` | Gauge | – |
+| `process_cpu_seconds_total` | Counter | – |
+
+#### Business Metrics (lazy DB collector)
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `redline_devices_total` | Gauge | – | Total registered devices |
+| `redline_device_status_total` | Gauge | `status` | Devices by status (Verfügbar / Wartung) |
+| `redline_defects_total` | Gauge | `state` | Defects by state (open / resolved) |
+| `redline_defects_by_category_total` | Gauge | `category` | Defects by category (all-time) |
+| `redline_active_events_total` | Gauge | – | Projects with at least one open defect |
+| `redline_users_total` | Gauge | `role` | Users by role (admin / team) |
+| `redline_email_recipients_active_total` | Gauge | – | Active email recipients |
+| `redline_db_up` | Gauge | – | 1 = DB reachable (set by `/healthz`) |
+| `redline_app_info` | Info | `version`, `environment` | App metadata |
+
+#### Collector Design
+
+`_BusinessCollector` in `metrics.py` implements the `prometheus_client` collector protocol:
+
+```python
+class _BusinessCollector:
+    def collect(self):          # called on every Prometheus scrape
+        with self._app.app_context():
+            yield GaugeMetricFamily("redline_devices_total", ...)
+            ...                 # queries DB; yields GaugeMetricFamily objects
+```
+
+**Key properties:**
+- **Zero request overhead** – DB queries only happen when Prometheus scrapes `/metrics`
+- **Lazy initialization** – `init_app(flask_app)` called once at startup, skipped in `TESTING` mode
+- **Error-safe** – any exception inside `collect()` is silently caught so scrapes never fail
+
+### Grafana Dashboard
+
+The dashboard (`grafana/dashboards/redline.json`) is auto-loaded by the provisioning provider and set as the default home page.
+
+#### Row 1 – System Health
+
+| Panel | Query | Type |
+|-------|-------|------|
+| App Status | `up{job="redline"}` | Stat (green UP / red DOWN) |
+| DB Status | `redline_db_up` | Stat (green OK / red ERROR) |
+| Process Uptime | `time() - process_start_time_seconds{job="redline"}` | Stat |
+| HTTP 5xx Error Rate | `sum(rate(flask_http_request_total{status=~"5.."}[5m])) / sum(rate(...))` | Stat |
+| Request Rate | `sum(rate(flask_http_request_total[1m]))` | Stat |
+
+#### Row 2 – HTTP Traffic
+
+| Panel | Type |
+|-------|------|
+| Requests/sec by Status Class (2xx/3xx/4xx/5xx) | Time series |
+| Request Latency p50 / p95 / p99 | Time series |
+| HTTP Status Distribution | Donut chart |
+| Top Endpoints by Request Count | Table |
+
+#### Row 3 – Business Metrics
+
+| Panel | Metric |
+|-------|--------|
+| Total Devices | `redline_devices_total` |
+| Open Defects | `redline_defects_total{state="open"}` |
+| Active Events | `redline_active_events_total` |
+| Active Email Recipients | `redline_email_recipients_active_total` |
+| Total Users | `sum(redline_users_total)` |
+| Devices in Maintenance | `redline_device_status_total{status="Wartung"}` |
+| Defects by Status | Donut (open vs. resolved) |
+| Defects by Category | Horizontal bar chart |
+
+#### Row 4 – System Resources
+
+| Panel | Metric |
+|-------|--------|
+| Process Memory (RSS + Virtual) | `process_resident_memory_bytes` |
+| CPU Usage | `rate(process_cpu_seconds_total[1m]) * 100` |
+
+### Test Coverage (`tests/test_observability.py`)
+
+| Class | Tests | What is verified |
+|-------|-------|-----------------|
+| `TestHealthzEndpoint` | 7 | Status code, JSON shape, no auth required, no redirect |
+| `TestMetricsEndpointAbsent` | 2 | `/metrics` not registered in `TESTING` mode |
+| `TestBusinessCollectorFamilyPresence` | 2 | All 7 metric families present and correctly typed |
+| `TestBusinessCollectorValues` | 7 | Values match live DB state |
+| `TestBusinessCollectorLabels` | 4 | Label names and values match schema |
+| `TestBusinessCollectorResilience` | 4 | No crash on missing app, no double-register |
+| `TestPrometheusGauges` | 4 | Gauges writable; `app_info` is correct type |
+| `TestMetricsTestIsolation` | 4 | `TESTING=True`, no `/metrics` route, `/healthz` works |
