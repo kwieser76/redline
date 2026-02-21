@@ -410,6 +410,16 @@ python app.py
 
 ---
 
+#### Häufige Probleme beim Update
+
+| Fehlermeldung | Ursache | Lösung |
+|---------------|---------|--------|
+| `fatal: not a git repository` | Falscher Ordner | Zuerst `cd C:\Users\...\Redline-` (Windows) bzw. `cd ~/Redline-` (Mac) ausführen |
+| `error: Your local changes ... would be overwritten` | Du hast Dateien lokal verändert | Zuerst `git stash` ausführen, dann nochmals `git pull origin Redline-main` |
+| `error: failed to push` | Keine Schreibrechte | Nur für Entwickler relevant; Update via `git pull` ist ausreichend |
+
+---
+
 ---
 
 ## 1. Voraussetzungen (Entwickler)
