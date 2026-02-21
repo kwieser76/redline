@@ -13,7 +13,7 @@
 7. [Database Migrations](#7-database-migrations)
 8. [Backup & Restore](#8-backup--restore)
 9. [Updating the Application](#9-updating-the-application)
-10. [Health Check](#10-health-check)
+10. [Health Check & Observability](#10-health-check--observability)
 11. [Troubleshooting](#11-troubleshooting)
 
 ---
@@ -116,6 +116,15 @@ FILEMAKER_PASSWORD=
 # ── Rate Limiting ──────────────────────────────────────────────────────────
 # For multi-worker deployments, use Redis:
 # RATELIMIT_STORAGE_URL=redis://redis:6379/0
+
+# ── Observability ────────────────────────────────────────────────────────
+# Grafana admin password (change before deploying!)
+GRAFANA_ADMIN_PASSWORD=change-me-grafana-password
+
+# Optional: override default service ports
+APP_PORT=8000
+PROMETHEUS_PORT=9090
+GRAFANA_PORT=3000
 ```
 
 ### Required Values Checklist
@@ -125,6 +134,7 @@ FILEMAKER_PASSWORD=
 | `SECRET_KEY` | All environments | **Must** be changed from default |
 | `APP_BASE_URL` | Production | Must be public HTTPS URL |
 | `WORKSHOP_EMAIL` | First run | Seed email recipient |
+| `GRAFANA_ADMIN_PASSWORD` | Docker Compose | Change from default before deploying |
 | `MAIL_*` | Event summary reports | Optional for basic usage |
 | `FILEMAKER_*` | FileMaker sync | Optional; leave password empty for POC mode |
 
@@ -152,28 +162,43 @@ On the **first startup** the application automatically:
 
 ## 5. Production – Docker Compose
 
+`docker compose up -d` starts **three services** automatically:
+
+| Service | Port (default) | Purpose |
+|---------|---------------|---------|
+| `redline` | 8000 | Flask app (gunicorn) |
+| `prometheus` | 9090 | Metrics collection & storage |
+| `grafana` | 3000 | Operations dashboard |
+
 ### Quick Start
 
 ```bash
 # 1. Copy and configure environment
 cp .env.example .env
-# Edit .env with production values (SECRET_KEY, APP_BASE_URL, etc.)
+# Edit .env – at minimum set:
+#   SECRET_KEY, APP_BASE_URL, GRAFANA_ADMIN_PASSWORD
 
-# 2. Build and start
+# 2. Build and start all services
 docker compose up -d
 
 # 3. View logs
 docker compose logs -f
 
-# 4. Check health
+# 4. Check status
 docker compose ps
 ```
 
-The app listens on port **8000** by default. Set `APP_PORT` in `.env` to override:
+After startup, open:
 
-```env
-APP_PORT=8080
-```
+| URL | Description |
+|-----|-------------|
+| `http://localhost:8000` | Redline application |
+| `http://localhost:8000/healthz` | Health probe (JSON) |
+| `http://localhost:8000/metrics` | Prometheus metrics |
+| `http://localhost:9090` | Prometheus UI |
+| `http://localhost:3000` | Grafana (admin / your password) |
+
+The Grafana "Redline Operations Dashboard" is the **default home page** – no manual setup required.
 
 ### Named Volumes
 
@@ -181,6 +206,8 @@ APP_PORT=8080
 |--------|-------------|---------|
 | `redline_data` | `/app/data` | SQLite database |
 | `redline_qrcodes` | `/app/static/qrcodes` | Generated QR code PNGs |
+| `prometheus_data` | `/prometheus` | Prometheus TSDB (30-day retention) |
+| `grafana_data` | `/var/lib/grafana` | Grafana state (annotations, users) |
 
 ### Adding Nginx as Reverse Proxy
 
@@ -387,20 +414,101 @@ sudo systemctl restart redline
 
 ---
 
-## 10. Health Check
+## 10. Health Check & Observability
 
-The Docker image includes a built-in health check:
+### /healthz Probe
+
+The `/healthz` endpoint is the single source of truth for application and database health.
+It is called by Docker's `HEALTHCHECK`, load balancers, and Prometheus alert rules.
 
 ```bash
-docker compose ps         # shows health status
-docker inspect redline_app | grep Health
+# Quick check
+curl http://localhost:8000/healthz
+# → {"db": "ok", "status": "ok"}   HTTP 200
+
+# Docker health status
+docker compose ps
+docker inspect redline_app | grep -A5 Health
 ```
 
-Manual check:
+| Response | Status | Meaning |
+|----------|--------|---------|
+| `{"status":"ok","db":"ok"}` | 200 | App and DB healthy |
+| `{"status":"degraded","db":"error"}` | 503 | DB unreachable |
+
+### Prometheus Metrics
+
+The `/metrics` endpoint exposes all Prometheus metrics in text format:
 
 ```bash
-curl -I http://localhost:8000/
-# Expect: HTTP/1.1 302 FOUND  (redirect to /auth/login)
+# View raw metrics
+curl http://localhost:8000/metrics | grep redline_
+
+# Example output:
+# redline_devices_total 4.0
+# redline_defects_total{state="open"} 2.0
+# redline_defects_total{state="resolved"} 7.0
+# redline_db_up 1.0
+# flask_http_request_total{method="GET",path="/report/<device_id>",status="200"} 42.0
+```
+
+### Grafana Dashboard
+
+The operations dashboard is pre-loaded at **http://localhost:3000** (default login: `admin` / your `GRAFANA_ADMIN_PASSWORD`).
+
+#### Dashboard Rows
+
+| Row | Panels |
+|-----|--------|
+| System Health | App Status, DB Status, Uptime, 5xx Error Rate, Req/s |
+| HTTP Traffic | Req/s by class, Latency p50/p95/p99, Status donut, Top endpoints |
+| Business Metrics | Devices, Open Defects, Active Events, Recipients, Users, Defect charts |
+| System Resources | Memory (RSS + virtual), CPU % |
+
+#### Changing the Admin Password
+
+```bash
+# Via .env before first start
+GRAFANA_ADMIN_PASSWORD=your-secure-password
+
+# Via CLI after startup
+docker compose exec grafana grafana-cli admin reset-admin-password new-password
+```
+
+#### Resetting Grafana (wipe dashboard customisations)
+
+```bash
+docker compose down
+docker volume rm redline_grafana_data
+docker compose up -d
+# Dashboard is re-provisioned automatically from grafana/dashboards/redline.json
+```
+
+### Prometheus Retention & Storage
+
+Default: **30 days** of time-series data in the `prometheus_data` Docker volume.
+
+To change retention, edit `docker-compose.yml`:
+
+```yaml
+command:
+  - "--storage.tsdb.retention.time=90d"   # change as needed
+```
+
+### Useful Prometheus Queries
+
+```promql
+# Is the app up?
+up{job="redline"}
+
+# Current open defects
+redline_defects_total{state="open"}
+
+# Average request latency over last 5 min (ms)
+histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le)) * 1000
+
+# HTTP error rate (%)
+sum(rate(flask_http_request_total{status=~"5.."}[5m])) / sum(rate(flask_http_request_total[5m])) * 100
 ```
 
 ---
@@ -438,3 +546,31 @@ SQLite only supports one writer at a time. For concurrent write load, migrate to
 ```env
 DATABASE_URL=postgresql://redline:password@localhost/redline
 ```
+
+### Grafana shows "No data" in panels
+
+1. Verify Prometheus is scraping successfully: open `http://localhost:9090/targets` and check that `redline` target is **UP**.
+2. If the target is **DOWN**, check that the `redline` container is healthy: `docker compose ps`.
+3. Wait one scrape interval (15 s) for the first data point to appear after startup.
+
+### Grafana dashboard not loading / missing
+
+The dashboard is provisioned from `grafana/dashboards/redline.json` on container start. If it is missing:
+
+```bash
+docker compose restart grafana
+```
+
+If the `grafana_data` volume is corrupted, wipe and recreate:
+
+```bash
+docker compose down && docker volume rm redline_grafana_data && docker compose up -d
+```
+
+### /metrics returns 404
+
+`/metrics` is only registered when `TESTING=False` (i.e. not in the test suite). In production this should never happen. Check that `FLASK_ENV=production` is set in `docker-compose.yml` or your `.env`.
+
+### Prometheus cannot reach /metrics
+
+By default Prometheus uses the Docker service name `redline` to reach the Flask app (see `prometheus/prometheus.yml`). Ensure the containers are on the same Docker network (default with `docker compose`). Do not use `localhost` in the Prometheus scrape target.
