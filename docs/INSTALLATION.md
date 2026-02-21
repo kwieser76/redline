@@ -328,6 +328,88 @@ python app.py
 
 ---
 
+### Schritt 11 – Update auf eine neue Version
+
+Wenn eine neue Version von Redline verfügbar ist, muss der Code aktualisiert werden. Die eigene `.env`-Datei bleibt dabei unberührt – alle persönlichen Einstellungen bleiben erhalten.
+
+> **Hinweis:** Die aktuell installierte Version wird unten auf jeder Seite der App angezeigt (z. B. `Version 1.0.0`).
+
+---
+
+#### Option A – ZIP herunterladen (ohne git)
+
+1. Stoppe die App (`Strg + C` in der Kommandozeile)
+2. Öffne das GitHub-Repository und lade die neue Version als ZIP herunter (grüner "Code"-Button → "Download ZIP")
+3. **Wichtig:** Sichere zuerst deine `.env`-Datei (z. B. kopiere sie auf den Desktop)
+4. Entpacke das neue ZIP in den **gleichen Ordner** wie die alte Version – Dateien werden überschrieben
+5. Kopiere deine gesicherte `.env`-Datei wieder in den Ordner
+6. Öffne die Kommandozeile im Ordner und aktiviere die virtuelle Umgebung (Schritt 5)
+7. Installiere neue/aktualisierte Pakete:
+
+```
+pip install -r requirements.txt
+```
+
+8. Starte die App neu:
+
+```
+python app.py
+```
+
+---
+
+#### Option B – Mit git (empfohlen, falls git installiert)
+
+Stoppe zuerst die App (`Strg + C`), dann:
+
+**Windows (PowerShell / Eingabeaufforderung im Projektordner):**
+```powershell
+# 1. Virtuelle Umgebung aktivieren (falls noch nicht aktiv)
+venv\Scripts\activate
+
+# 2. Neue Version herunterladen
+git pull origin main
+
+# 3. Neue/aktualisierte Pakete installieren (nur falls requirements.txt geändert wurde)
+pip install -r requirements.txt
+
+# 4. App neu starten
+python app.py
+```
+
+**Mac (Terminal im Projektordner):**
+```bash
+# 1. Virtuelle Umgebung aktivieren (falls noch nicht aktiv)
+source venv/bin/activate
+
+# 2. Neue Version herunterladen
+git pull origin main
+
+# 3. Neue/aktualisierte Pakete installieren (nur falls requirements.txt geändert wurde)
+pip install -r requirements.txt
+
+# 4. App neu starten
+python app.py
+```
+
+---
+
+#### Was passiert mit meinen Daten?
+
+| Was | Beim Update |
+|-----|-------------|
+| Datenbank (`redline.db`) | Bleibt vollständig erhalten |
+| `.env`-Datei | Bleibt erhalten – wird nie überschrieben |
+| QR-Codes | Bleiben erhalten (oder werden neu generiert, falls nötig) |
+| Geräte, Defekte, Benutzer | Bleiben alle erhalten |
+
+> Falls in den Release-Hinweisen eine "Datenbank-Migration" erwähnt wird, führe nach dem Update zusätzlich aus:
+> ```
+> flask --app app db upgrade
+> ```
+
+---
+
 ---
 
 ## 1. Voraussetzungen (Entwickler)

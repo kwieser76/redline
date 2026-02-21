@@ -2,7 +2,11 @@
 {% block title %}Ereignisberichte{% endblock %}
 
 {% block content %}
-<div class="section-title">Ereignisbericht senden</div>
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Ereignisbericht senden</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Zurück zum Dashboard</a>
+</div>
 
 <div class="card">
   <div class="card-title">Zusammenfassungsbericht</div>
@@ -45,9 +49,11 @@
           <td><code>{{ project_number }}</code></td>
           <td>
             <button type="button" class="btn btn-sm btn-secondary"
+              data-event-name="{{ event_name | e }}"
+              data-project-number="{{ project_number | e }}"
               onclick="
-                document.getElementById('event_name').value = {{ event_name | tojson }};
-                document.getElementById('project_number').value = {{ project_number | tojson }};
+                document.getElementById('event_name').value = this.dataset.eventName;
+                document.getElementById('project_number').value = this.dataset.projectNumber;
                 window.scrollTo({top:0,behavior:'smooth'});
               ">
               Übernehmen

@@ -415,3 +415,14 @@ def _move_category(cat_id: int, direction: str) -> None:
         cats[idx].sort_order,
     )
     db.session.commit()
+
+
+# --------------------------------------------------------------------------- #
+#  Help page                                                                    #
+# --------------------------------------------------------------------------- #
+
+
+@admin_bp.route("/help")
+@login_required
+def help_page():
+    return render_template("admin/help.html")

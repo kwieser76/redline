@@ -11,7 +11,7 @@ from flask_login import LoginManager, current_user
 from flask_mail import Mail
 from sqlalchemy import text
 
-from config import Config, config_by_name
+from config import APP_VERSION, Config, config_by_name
 from extensions import limiter, metrics_exporter, migrate
 from metrics import app_info, business_collector, db_up
 from models import DefectCategory, Device, EmailRecipient, User, db
@@ -67,7 +67,7 @@ def create_app(config_class=None) -> Flask:
     if not app.config.get("TESTING"):
         env = os.environ.get("FLASK_ENV", "development")
         metrics_exporter.init_app(app)
-        app_info.info({"version": "1.0.0", "environment": env})
+        app_info.info({"version": APP_VERSION, "environment": env})
         business_collector.init_app(app)
 
     login_manager = LoginManager(app)
@@ -99,6 +99,14 @@ def create_app(config_class=None) -> Flask:
                 "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
             )
         return response
+
+    # ---------------------------------------------------------------------- #
+    #  Template globals                                                        #
+    # ---------------------------------------------------------------------- #
+
+    @app.context_processor
+    def inject_app_version():
+        return {"app_version": APP_VERSION}
 
     # ---------------------------------------------------------------------- #
     #  Blueprints                                                              #
