@@ -1,24 +1,336 @@
-# Redline – Installation & Deployment Guide
+# Redline – Installations- & Deployment-Anleitung
 
 ---
 
-## Table of Contents
+## Inhaltsverzeichnis
 
-1. [Prerequisites](#1-prerequisites)
-2. [Local Development (Python venv)](#2-local-development-python-venv)
-3. [Environment Configuration](#3-environment-configuration)
-4. [First Run & Seed Data](#4-first-run--seed-data)
-5. [Production – Docker Compose](#5-production--docker-compose)
-6. [Production – Bare Metal (Gunicorn + Nginx)](#6-production--bare-metal-gunicorn--nginx)
-7. [Database Migrations](#7-database-migrations)
+0. [Lokales Testen – Schritt-für-Schritt (Windows & Mac, kein Entwicklerwissen nötig)](#0-lokales-testen--schritt-für-schritt-windows--mac)
+1. [Voraussetzungen (Entwickler)](#1-voraussetzungen-entwickler)
+2. [Lokale Entwicklung (Python venv)](#2-lokale-entwicklung-python-venv)
+3. [Umgebungskonfiguration (.env)](#3-umgebungskonfiguration-env)
+4. [Erster Start & Seed-Daten](#4-erster-start--seed-daten)
+5. [Produktion – Docker Compose](#5-produktion--docker-compose)
+6. [Produktion – Bare Metal (Gunicorn + Nginx)](#6-produktion--bare-metal-gunicorn--nginx)
+7. [Datenbank-Migrationen](#7-datenbank-migrationen)
 8. [Backup & Restore](#8-backup--restore)
-9. [Updating the Application](#9-updating-the-application)
+9. [Anwendung aktualisieren](#9-anwendung-aktualisieren)
 10. [Health Check & Observability](#10-health-check--observability)
-11. [Troubleshooting](#11-troubleshooting)
+11. [Fehlerbehebung](#11-fehlerbehebung)
 
 ---
 
-## 1. Prerequisites
+## 0. Lokales Testen – Schritt-für-Schritt (Windows & Mac)
+
+> Diese Anleitung richtet sich an alle, die Redline **lokal auf ihrem Laptop oder PC ausprobieren** möchten – auch ohne Programmierkenntnisse.
+> Am Ende läuft die App im Browser und kann mit dem iPhone per QR-Code getestet werden.
+
+---
+
+### Schritt 1 – Python installieren
+
+Python ist die Programmiersprache, auf der Redline läuft. Es muss einmalig installiert werden.
+
+#### Windows
+
+1. Öffne im Browser: **https://www.python.org/downloads/**
+2. Klicke auf den großen gelben Button **"Download Python 3.x.x"**
+3. Starte die heruntergeladene Datei (`python-3.x.x-amd64.exe`)
+4. **Wichtig:** Aktiviere ganz unten das Häkchen **"Add Python to PATH"** (sonst funktioniert nichts!)
+5. Klicke auf **"Install Now"** und warte, bis die Installation abgeschlossen ist
+6. Klicke auf **"Close"**
+
+**Prüfen:** Öffne die Eingabeaufforderung (`Windows-Taste` → `cmd` eintippen → Enter) und tippe:
+```
+python --version
+```
+Es sollte `Python 3.x.x` erscheinen.
+
+#### Mac
+
+1. Öffne im Browser: **https://www.python.org/downloads/**
+2. Klicke auf den großen gelben Button **"Download Python 3.x.x"**
+3. Starte die heruntergeladene `.pkg`-Datei und folge dem Installationsassistenten
+4. Nach der Installation öffne das **Terminal** (`Cmd + Leertaste` → `Terminal` → Enter)
+
+**Prüfen:**
+```
+python3 --version
+```
+Es sollte `Python 3.x.x` erscheinen.
+
+---
+
+### Schritt 2 – Projektdateien herunterladen
+
+Du benötigst die Redline-Dateien auf deinem Computer.
+
+#### Option A – ZIP herunterladen (einfachste Methode, kein git nötig)
+
+1. Öffne das GitHub-Repository im Browser
+2. Klicke auf den grünen Button **"Code"** → **"Download ZIP"**
+3. Entpacke die ZIP-Datei an einen Ort, den du dir merken kannst, z. B.:
+   - Windows: `C:\Users\DeinName\Redline`
+   - Mac: `/Users/DeinName/Redline`
+
+#### Option B – Mit git (falls git installiert ist)
+
+**Windows** (Eingabeaufforderung / PowerShell):
+```
+git clone https://github.com/your-org/Redline-.git C:\Users\DeinName\Redline
+```
+
+**Mac** (Terminal):
+```bash
+git clone https://github.com/your-org/Redline-.git ~/Redline
+```
+
+---
+
+### Schritt 3 – Ordner öffnen
+
+Öffne die Kommandozeile **direkt im Projektordner**:
+
+#### Windows
+
+1. Öffne den Projektordner im Windows Explorer (z. B. `C:\Users\DeinName\Redline`)
+2. Klicke in die Adressleiste oben, tippe `cmd` und drücke Enter
+   → Die Eingabeaufforderung öffnet sich direkt im richtigen Ordner
+
+Alternativ: PowerShell → mit `cd` navigieren:
+```powershell
+cd C:\Users\DeinName\Redline
+```
+
+#### Mac
+
+Terminal öffnen und mit `cd` navigieren:
+```bash
+cd ~/Redline
+```
+
+---
+
+### Schritt 4 – Virtuelle Umgebung erstellen
+
+Eine virtuelle Umgebung isoliert die Abhängigkeiten von Redline vom Rest deines Systems. Nur einmalig nötig.
+
+**Windows (Eingabeaufforderung / PowerShell):**
+```powershell
+python -m venv venv
+```
+
+**Mac (Terminal):**
+```bash
+python3 -m venv venv
+```
+
+---
+
+### Schritt 5 – Virtuelle Umgebung aktivieren
+
+**Muss bei jedem neuen Start der Kommandozeile wiederholt werden.**
+
+**Windows (Eingabeaufforderung):**
+```
+venv\Scripts\activate
+```
+
+**Windows (PowerShell):**
+```powershell
+venv\Scripts\Activate.ps1
+```
+
+> Falls PowerShell eine Fehlermeldung zeigt (`...cannot be loaded because running scripts is disabled...`), führe zuerst diesen Befehl aus:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+> Dann nochmals `venv\Scripts\Activate.ps1` eingeben.
+
+**Mac:**
+```bash
+source venv/bin/activate
+```
+
+Nach erfolgreicher Aktivierung erscheint `(venv)` am Anfang der Zeile, z. B. `(venv) C:\Users\DeinName\Redline>`.
+
+---
+
+### Schritt 6 – Abhängigkeiten installieren
+
+Installiert alle benötigten Python-Pakete. Nur einmalig nötig.
+
+```
+pip install -r requirements.txt
+```
+
+Dies dauert je nach Internetverbindung 1–3 Minuten.
+
+---
+
+### Schritt 7 – Konfigurationsdatei anlegen
+
+Redline benötigt eine Datei namens `.env` mit den Einstellungen.
+
+#### Windows (Eingabeaufforderung):
+```
+copy .env.example .env
+```
+
+#### Mac (Terminal):
+```bash
+cp .env.example .env
+```
+
+Öffne die `.env`-Datei jetzt zum Bearbeiten:
+
+**Windows:** Rechtsklick auf `.env` im Explorer → "Öffnen mit" → Editor (Notepad)
+
+**Mac:** Im Terminal:
+```bash
+open -e .env
+```
+
+Passe diese zwei Zeilen an:
+
+```env
+SECRET_KEY=irgendein-langer-zufaelliger-text-123abc
+APP_BASE_URL=http://localhost:5000
+```
+
+> **Hinweis:** Für den lokalen Test reicht das. Für den iPhone-Zugriff aus demselben WLAN-Netzwerk (Schritt 9) muss `APP_BASE_URL` angepasst werden – das wird dort erklärt.
+
+Alle anderen Einstellungen können für lokale Tests so bleiben wie sie sind.
+
+---
+
+### Schritt 8 – App starten
+
+**Windows:**
+```
+python app.py
+```
+
+**Mac:**
+```bash
+python app.py
+```
+
+Die App ist bereit, wenn du folgendes siehst:
+```
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.x.x:5000
+```
+
+Öffne im Browser: **http://localhost:5000**
+
+#### Standard-Zugangsdaten (sofort nach dem ersten Login ändern!):
+
+| Benutzername | Passwort   | Rolle         |
+|--------------|------------|---------------|
+| `admin`      | `admin123` | Administrator |
+| `team_login` | `team2025` | Techniker     |
+
+**App stoppen:** `Strg + C` in der Kommandozeile drücken.
+
+---
+
+### Schritt 9 – iPhone im gleichen WLAN testen (QR-Codes scannen)
+
+So kannst du die QR-Code-Funktion mit deinem iPhone testen, ohne einen Server aufzusetzen.
+
+#### Voraussetzung
+PC/Mac und iPhone müssen mit **demselben WLAN-Router** verbunden sein.
+
+#### Eigene IP-Adresse herausfinden
+
+**Windows** – in der Eingabeaufforderung:
+```
+ipconfig
+```
+Suche unter dem aktiven Adapter nach **IPv4-Adresse**, z. B. `192.168.178.133`
+
+**Mac** – im Terminal:
+```bash
+ipconfig getifaddr en0
+```
+(Falls kein Ergebnis: `en1` versuchen – je nach ob WLAN oder Kabel)
+
+#### .env anpassen
+
+Öffne die `.env`-Datei und ändere `APP_BASE_URL` auf deine IP:
+```env
+APP_BASE_URL=http://192.168.178.133:5000
+```
+(Ersetze `192.168.178.133` durch deine eigene IP-Adresse)
+
+#### Firewall-Freigabe (nur Windows)
+
+Damit das iPhone dich erreichen kann, muss Port 5000 in der Windows Firewall freigegeben werden.
+
+Öffne **PowerShell als Administrator** (`Windows-Taste` → `PowerShell` → Rechtsklick → "Als Administrator ausführen") und führe aus:
+
+```powershell
+netsh advfirewall firewall add rule name="Redline Port 5000" dir=in action=allow protocol=TCP localport=5000
+```
+
+Auf dem Mac ist keine zusätzliche Firewall-Freigabe nötig.
+
+#### App neu starten & testen
+
+1. Stoppe die App (`Strg + C`)
+2. Starte sie neu: `python app.py` (Windows) / `python app.py` (Mac)
+3. Auf dem iPhone: **Chrome oder Safari** öffnen
+4. Adresse eintippen: `http://192.168.178.133:5000` (deine IP)
+5. Im Admin-Bereich ein Gerät anlegen, QR-Code herunterladen/anzeigen und mit der iPhone-Kamera scannen
+
+---
+
+### Schritt 10 – App beim nächsten Mal starten
+
+Beim nächsten Start reichen nur noch diese Schritte:
+
+**Windows:**
+```powershell
+# 1. In den Projektordner wechseln
+cd C:\Users\DeinName\Redline
+
+# 2. Virtuelle Umgebung aktivieren
+venv\Scripts\activate
+
+# 3. App starten
+python app.py
+```
+
+**Mac:**
+```bash
+# 1. In den Projektordner wechseln
+cd ~/Redline
+
+# 2. Virtuelle Umgebung aktivieren
+source venv/bin/activate
+
+# 3. App starten
+python app.py
+```
+
+---
+
+### Häufige Probleme beim lokalen Start
+
+| Problem | Lösung |
+|---------|--------|
+| `python` wird nicht erkannt (Windows) | Python wurde ohne "Add to PATH" installiert → Python neu installieren, Häkchen setzen |
+| `(venv)` erscheint nicht | Schritt 5 nochmals ausführen; bei PowerShell zuerst `Set-ExecutionPolicy` (siehe oben) |
+| Port 5000 bereits belegt | Eine andere App nutzt Port 5000 → App beenden oder in `.env` `APP_PORT=5001` setzen |
+| iPhone kann App nicht erreichen | Firewall-Regel prüfen (Windows); sicherstellen, dass iPhone im gleichen WLAN ist |
+| `ModuleNotFoundError` beim Start | Virtuelle Umgebung nicht aktiviert oder `pip install -r requirements.txt` nicht ausgeführt |
+| `.env` Datei nicht gefunden | `.env.example` wurde nicht nach `.env` kopiert (Schritt 7 wiederholen) |
+
+---
+
+---
+
+## 1. Voraussetzungen (Entwickler)
 
 ### Local Development
 
@@ -46,7 +358,7 @@
 
 ---
 
-## 2. Local Development (Python venv)
+## 2. Lokale Entwicklung (Python venv)
 
 ```bash
 # 1. Clone the repository
@@ -72,7 +384,7 @@ The app is available at **http://localhost:5000**.
 
 ---
 
-## 3. Environment Configuration
+## 3. Umgebungskonfiguration (.env)
 
 Copy `.env.example` to `.env` and fill in all required values:
 
@@ -140,7 +452,7 @@ GRAFANA_PORT=3000
 
 ---
 
-## 4. First Run & Seed Data
+## 4. Erster Start & Seed-Daten
 
 On the **first startup** the application automatically:
 
@@ -160,7 +472,7 @@ On the **first startup** the application automatically:
 
 ---
 
-## 5. Production – Docker Compose
+## 5. Produktion – Docker Compose
 
 `docker compose up -d` starts **three services** automatically:
 
@@ -257,7 +569,7 @@ services:
 
 ---
 
-## 6. Production – Bare Metal (Gunicorn + Nginx)
+## 6. Produktion – Bare Metal (Gunicorn + Nginx)
 
 ```bash
 # 1. Create a system user
@@ -322,7 +634,7 @@ sudo systemctl status redline
 
 ---
 
-## 7. Database Migrations
+## 7. Datenbank-Migrationen
 
 The app uses **Flask-Migrate** (Alembic) for schema migrations.
 
@@ -390,7 +702,7 @@ QR code images are regenerated on demand (they are not stored permanently). The 
 
 ---
 
-## 9. Updating the Application
+## 9. Anwendung aktualisieren
 
 ### Docker Compose
 
@@ -513,7 +825,7 @@ sum(rate(flask_http_request_total{status=~"5.."}[5m])) / sum(rate(flask_http_req
 
 ---
 
-## 11. Troubleshooting
+## 11. Fehlerbehebung
 
 ### QR codes point to localhost
 

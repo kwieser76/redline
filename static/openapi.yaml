@@ -221,6 +221,54 @@ components:
           additionalProperties:
             type: string
 
+  responses:
+    Unauthorized:
+      description: Authentifizierung erforderlich
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Authentication required.
+
+    Forbidden:
+      description: Keine Admin-Berechtigung
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Admin access required.
+
+    NotFound:
+      description: Ressource nicht gefunden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Device 'CAM-999' not found.
+
+    BadRequest:
+      description: Validierungsfehler
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Validation failed.
+            fields:
+              category: Required.
+
+    Conflict:
+      description: Konflikt (z.B. ID bereits vorhanden)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: device_id 'CAM-001' already exists.
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -576,59 +624,6 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-
-# ---------------------------------------------------------------------------
-# Shared responses
-# ---------------------------------------------------------------------------
-
-components:
-  responses:
-    Unauthorized:
-      description: Authentifizierung erforderlich
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            error: Authentication required.
-
-    Forbidden:
-      description: Keine Admin-Berechtigung
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            error: Admin access required.
-
-    NotFound:
-      description: Ressource nicht gefunden
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            error: Device 'CAM-999' not found.
-
-    BadRequest:
-      description: Validierungsfehler
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            error: Validation failed.
-            fields:
-              category: Required.
-
-    Conflict:
-      description: Konflikt (z.B. ID bereits vorhanden)
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            error: device_id 'CAM-001' already exists.
 
 tags:
   - name: Geräte
