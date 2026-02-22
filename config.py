@@ -80,6 +80,14 @@ class Config:
     QR_CODE_DIR: str = os.path.join(BASE_DIR, "static", "qrcodes")
 
     # ------------------------------------------------------------------ #
+    #  Photo uploads (werkstatt comments + defect reports)                 #
+    # ------------------------------------------------------------------ #
+    UPLOAD_FOLDER: str = os.path.join(BASE_DIR, "static", "uploads")
+    # Flask enforces this limit and returns 413 automatically
+    MAX_CONTENT_LENGTH: int = 16 * 1024 * 1024  # 16 MB
+    ALLOWED_PHOTO_EXTENSIONS: set = {"jpg", "jpeg", "png", "gif", "webp"}
+
+    # ------------------------------------------------------------------ #
     #  Rate limiting (flask-limiter)                                       #
     # ------------------------------------------------------------------ #
     RATELIMIT_ENABLED: bool = True
@@ -182,6 +190,7 @@ class TestConfig(Config):
     MAIL_SUPPRESS_SEND: bool = True
     APP_BASE_URL: str = "http://testserver"
     QR_CODE_DIR: str = "/tmp/test_redline_qrcodes"
+    UPLOAD_FOLDER: str = "/tmp/test_redline_uploads"
     RATELIMIT_ENABLED: bool = False  # never throttle tests
     SHOW_DEBUG_INFO: bool = False
 

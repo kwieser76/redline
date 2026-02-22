@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Werkstatt – Offene Defekte{% endblock %}
+
+{% block content %}
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Werkstatt – Offene Defekte</div>
+  <div class="spacer"></div>
+  <span style="font-size:13px;color:var(--gray-600);">{{ defects|length }} offen</span>
+</div>
+
+{% if defects %}
+<div class="card" style="padding:0;overflow:hidden;">
+  <!-- Table header -->
+  <div style="display:grid;grid-template-columns:1fr 90px 120px 90px 70px;gap:0;padding:10px 20px;background:var(--gray-100);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-600);border-bottom:1px solid var(--gray-200);">
+    <div>Gerät / Kategorie</div>
+    <div>Gemeldet</div>
+    <div>Werkstatt-Status</div>
+    <div style="text-align:center;">Kommentare</div>
+    <div></div>
+  </div>
+
+  {% for defect in defects %}
+  <div style="display:grid;grid-template-columns:1fr 90px 120px 90px 70px;gap:0;padding:14px 20px;align-items:center;{% if not loop.last %}border-bottom:1px solid var(--gray-100);{% endif %}">
+
+    <!-- Device + Category -->
+    <div>
+      <div style="font-weight:700;font-size:15px;">{{ defect.device.name }}</div>
+      <div style="font-size:12px;color:var(--red);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">{{ defect.device.device_id }}</div>
+      <div style="font-size:13px;color:var(--gray-600);margin-top:2px;">{{ defect.category }}</div>
+      <div style="font-size:12px;color:var(--gray-600);margin-top:2px;">{{ defect.description | truncate(80) }}</div>
+    </div>
+
+    <!-- Reported at + by -->
+    <div style="font-size:12px;color:var(--gray-600);">
+      <div>{{ defect.created_at.strftime('%d.%m.%Y') }}</div>
+      <div>{{ defect.created_at.strftime('%H:%M') }}</div>
+      <div style="margin-top:2px;font-weight:600;">{{ defect.reporter }}</div>
+    </div>
+
+    <!-- Werkstatt status badge -->
+    <div>
+      <span class="badge badge-ws-{{ defect.werkstatt_status | lower | replace(' ', '-') }}">
+        {{ defect.werkstatt_status }}
+      </span>
+    </div>
+
+    <!-- Comment + photo count -->
+    <div style="text-align:center;font-size:13px;color:var(--gray-600);">
+      {% set photo_count = defect.comments | selectattr('photo_path') | list | length %}
+      <div>💬 {{ defect.comments | length }}</div>
+      {% if photo_count %}<div>📷 {{ photo_count }}</div>{% endif %}
+    </div>
+
+    <!-- Action -->
+    <div style="text-align:right;">
+      <a href="{{ url_for('werkstatt.defekt_detail', defect_id=defect.id) }}" class="btn btn-sm btn-primary">
+        Öffnen
+      </a>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card" style="text-align:center;color:var(--gray-600);padding:48px 24px;">
+  <div style="font-size:48px;margin-bottom:12px;">✅</div>
+  <div style="font-size:18px;font-weight:700;">Keine offenen Defekte</div>
+  <div style="font-size:14px;margin-top:6px;">Alle Geräte sind aktuell fehlerfrei.</div>
+</div>
+{% endif %}
+{% endblock %}

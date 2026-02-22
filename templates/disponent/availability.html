@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Geräteverfügbarkeit{% endblock %}
+
+{% block content %}
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Geräteverfügbarkeit</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('disponent.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
+</div>
+
+<!-- Filter -->
+<div class="card">
+  <div class="card-title">Zeitraum &amp; Filter</div>
+  <div class="card-subtitle">
+    Zeigt alle Geräte, die im gewählten Zeitraum nicht verfügbar sind oder waren.
+  </div>
+
+  <form method="GET" action="{{ url_for('disponent.availability') }}"
+        style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-top:12px;">
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+      <label for="from">Von</label>
+      <input type="date" id="from" name="from" value="{{ from_date.isoformat() }}" />
+    </div>
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+      <label for="to">Bis</label>
+      <input type="date" id="to" name="to" value="{{ to_date.isoformat() }}" />
+    </div>
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px;">
+      <label for="category">Kategorie</label>
+      <select id="category" name="category">
+        <option value="">– Alle –</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if cat == category %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button type="submit" class="btn btn-primary">Filtern</button>
+      <a href="{{ url_for('disponent.availability') }}" class="btn btn-secondary">Zurücksetzen</a>
+    </div>
+  </form>
+</div>
+
+<!-- Results -->
+<div class="card">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;">
+    <div class="card-title" style="margin-bottom:0;flex:1;">
+      Ergebnis: {{ defects | length }} Einträge
+    </div>
+    {% if defects %}
+    <a href="{{ url_for('disponent.availability_export', **request.args) }}"
+       class="btn btn-sm btn-outline" title="Als CSV-Datei exportieren">
+      CSV exportieren
+    </a>
+    {% endif %}
+  </div>
+
+  {% if defects %}
+  <div class="card-subtitle" style="margin-bottom:10px;">
+    Zeitraum: {{ from_date.strftime('%d.%m.%Y') }} – {{ to_date.strftime('%d.%m.%Y') }}
+    {% if category %} · Kategorie: <strong>{{ category }}</strong>{% endif %}
+  </div>
+
+  <div class="table-wrapper">
+    <table id="availability-table">
+      <thead>
+        <tr>
+          <th data-sort="text" style="cursor:pointer;">Gerät ↕</th>
+          <th data-sort="text">Geräte-ID</th>
+          <th data-sort="text" style="cursor:pointer;">Kategorie ↕</th>
+          <th>Grund</th>
+          <th data-sort="date" style="cursor:pointer;">Seit ↕</th>
+          <th data-sort="date" style="cursor:pointer;">Bis ↕</th>
+          <th data-sort="text" style="cursor:pointer;">Status ↕</th>
+          <th>Event / Projekt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in defects %}
+        <tr>
+          <td><strong>{{ d.device.name }}</strong></td>
+          <td><code>{{ d.device.device_id }}</code></td>
+          <td>{{ d.category }}</td>
+          <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+              title="{{ d.description }}">{{ d.description }}</td>
+          <td data-value="{{ d.created_at.isoformat() }}">
+            {{ d.created_at.strftime('%d.%m.%Y %H:%M') }}
+          </td>
+          <td data-value="{{ d.resolved_at.isoformat() if d.resolved_at else '9999-12-31' }}">
+            {% if d.resolved_at %}
+              {{ d.resolved_at.strftime('%d.%m.%Y %H:%M') }}
+            {% else %}
+              <em style="color:var(--gray-500);">offen</em>
+            {% endif %}
+          </td>
+          <td>
+            {% if d.status == 'Offen' %}
+              <span class="badge badge-open" style="white-space:nowrap;">In Wartung</span>
+            {% else %}
+              <span class="badge badge-resolved" style="white-space:nowrap;">Behoben</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;">
+            {{ d.event_name }}<br><code>{{ d.project_number }}</code>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <p style="color:var(--gray-500);margin:16px 0 0;">
+    Keine nicht verfügbaren Geräte im gewählten Zeitraum
+    {%- if category %} (Kategorie: {{ category }}){% endif %}.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const table = document.getElementById('availability-table');
+  if (!table) return;
+  const headers = table.querySelectorAll('th[data-sort]');
+  let sortCol = -1, sortAsc = true;
+  headers.forEach(function(th, idx){
+    th.addEventListener('click', function(){
+      if (sortCol === idx) { sortAsc = !sortAsc; } else { sortCol = idx; sortAsc = true; }
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const type = th.dataset.sort;
+      rows.sort(function(a, b){
+        let va = a.children[idx].dataset.value || a.children[idx].textContent.trim();
+        let vb = b.children[idx].dataset.value || b.children[idx].textContent.trim();
+        const cmp = va.localeCompare(vb, 'de', {numeric: true});
+        return sortAsc ? cmp : -cmp;
+      });
+      rows.forEach(function(r){ tbody.appendChild(r); });
+    });
+  });
+})();
+</script>
+{% endblock %}

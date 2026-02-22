@@ -440,6 +440,86 @@ tr:hover td { background: var(--gray-100); }
 .error-icon { font-size: 64px; text-align: center; margin-bottom: 16px; }
 .error-card { text-align: center; }
 
+/* ---------- Werkstatt status badges ---------- */
+/* Ordered from "no action" (gray) → "done" (green) */
+.badge-ws-ausstehend  { background: #e9ecef; color: #495057; }
+.badge-ws-in-prüfung  { background: #fff3cd; color: #664d03; }
+.badge-ws-in-reparatur{ background: #d1ecf1; color: #0c5460; }
+.badge-ws-repariert   { background: #d4edda; color: #155724; }
+
+/* ---------- Comment cards ---------- */
+.comment-card {
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.comment-author {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--gray-900);
+}
+.comment-role {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+/* Role colours */
+.comment-role-admin     { background: #d1ecf1; color: #0c5460; }
+.comment-role-werkstatt { background: #ffe4cc; color: #7a3800; }
+.comment-role-community { background: #e9ecef; color: #495057; }
+.comment-role-disponent { background: #fff3cd; color: #664d03; }
+
+.comment-time {
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-left: auto;
+}
+.comment-text {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--gray-900);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comment-photo {
+  margin-top: 10px;
+}
+.comment-img {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--gray-200);
+  display: block;
+  cursor: pointer;
+  object-fit: contain;
+}
+.comment-img:hover { opacity: .9; }
+
+/* ---------- Photo file input ---------- */
+.photo-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-family: var(--font);
+  border: 1.5px dashed var(--gray-400);
+  border-radius: var(--radius);
+  background: var(--gray-100);
+  color: var(--gray-900);
+  cursor: pointer;
+}
+
 /* ---------- Responsive adjustments ---------- */
 @media (max-width: 480px) {
   .navbar { padding: 0 16px; height: 58px; }

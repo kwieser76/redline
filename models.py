@@ -3,8 +3,10 @@ Redline – SQLAlchemy database models.
 
 All timestamps are stored in UTC.  Status fields use German values to match
 the UI and FileMaker integration:
-  Device.status   : "Verfügbar" | "Wartung"
-  Defect.status   : "Offen"     | "Behoben"
+  Device.status          : "Verfügbar" | "Wartung" | "Reserviert"
+  Defect.status          : "Offen"     | "Behoben"
+  Defect.werkstatt_status: "Ausstehend" | "In Prüfung" | "In Reparatur" | "Repariert"
+  User roles             : is_admin=True | is_disponent=True | is_werkstatt=True | (none → community)
 """
 
 from datetime import datetime, timezone
@@ -23,10 +25,23 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    is_disponent = db.Column(db.Boolean, default=False, nullable=False)
+    is_werkstatt = db.Column(db.Boolean, default=False, nullable=False)
     is_community = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
+
+    @property
+    def role(self) -> str:
+        """Human-readable role string for templates and logging."""
+        if self.is_admin:
+            return "admin"
+        if self.is_disponent:
+            return "disponent"
+        if self.is_werkstatt:
+            return "werkstatt"
+        return "community"
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -35,7 +50,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self) -> str:
-        return f"<User {self.username}>"
+        return f"<User {self.username} role={self.role}>"
 
 
 class Device(db.Model):
@@ -50,7 +65,7 @@ class Device(db.Model):
         default="Verfügbar",
         nullable=False,
         index=True,
-    )  # "Verfügbar" | "Wartung"
+    )  # "Verfügbar" | "Wartung" | "Reserviert"
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -120,6 +135,9 @@ class Defect(db.Model):
     status = db.Column(
         db.String(20), default="Offen", nullable=False
     )  # "Offen" | "Behoben"
+    werkstatt_status = db.Column(
+        db.String(20), default="Ausstehend", nullable=False
+    )  # "Ausstehend" | "In Prüfung" | "In Reparatur" | "Repariert"
     reporter = db.Column(db.String(80), default="team_login", nullable=False)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
@@ -127,5 +145,39 @@ class Defect(db.Model):
     resolved_at = db.Column(db.DateTime, nullable=True)
     resolution_notes = db.Column(db.Text, default="")
 
+    # Comments (werkstatt notes + photos)
+    comments = db.relationship(
+        "Comment",
+        backref="defect",
+        lazy=True,
+        order_by="Comment.created_at.asc()",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
         return f"<Defect {self.id} device={self.device_id} status={self.status}>"
+
+
+class Comment(db.Model):
+    """A werkstatt note (with optional photo) attached to a defect."""
+
+    __tablename__ = "comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    defect_id = db.Column(
+        db.Integer,
+        db.ForeignKey("defects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Denormalized author info: survives user deletion
+    username = db.Column(db.String(80), nullable=False)
+    user_role = db.Column(db.String(20), nullable=False, default="community")
+    text = db.Column(db.Text, nullable=False)
+    photo_path = db.Column(db.String(500), nullable=True)  # filename in uploads folder
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<Comment {self.id} defect={self.defect_id} by={self.username}>"

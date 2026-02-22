@@ -226,6 +226,12 @@ def users():
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             is_admin = request.form.get("is_admin") == "on"
+            is_disponent = request.form.get("is_disponent") == "on" and not is_admin
+            is_werkstatt = (
+                request.form.get("is_werkstatt") == "on"
+                and not is_admin
+                and not is_disponent
+            )
             if not username or not password:
                 flash("Benutzername und Passwort sind erforderlich.", "danger")
             elif len(password) < 8:
@@ -233,7 +239,12 @@ def users():
             elif User.query.filter_by(username=username).first():
                 flash(f"Benutzername '{username}' ist bereits vergeben.", "danger")
             else:
-                user = User(username=username, is_admin=is_admin)
+                user = User(
+                    username=username,
+                    is_admin=is_admin,
+                    is_disponent=is_disponent,
+                    is_werkstatt=is_werkstatt,
+                )
                 user.set_password(password)
                 db.session.add(user)
                 _safe_commit(f"Benutzer '{username}' wurde angelegt.")

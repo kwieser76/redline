@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Disponent Dashboard{% endblock %}
+
+{% block content %}
+<div class="section-title">Dashboard</div>
+
+<!-- Stat tiles – each is a clickable link -->
+<div class="stat-grid">
+
+  <a href="{{ url_for('disponent.tile_detail', filter_key='alle') }}"
+     class="stat-card stat-card-link" title="Alle Geräte anzeigen">
+    <div class="stat-value stat-blue">{{ total }}</div>
+    <div class="stat-label">Geräte gesamt</div>
+    <div class="stat-hint">→ Alle anzeigen</div>
+  </a>
+
+  <a href="{{ url_for('disponent.tile_detail', filter_key='nicht-verfuegbar') }}"
+     class="stat-card stat-card-link" title="Nicht verfügbare Geräte anzeigen">
+    <div class="stat-value stat-red">{{ nicht_verfuegbar }}</div>
+    <div class="stat-label">Nicht verfügbar</div>
+    <div class="stat-hint">→ Liste anzeigen</div>
+  </a>
+
+  <a href="{{ url_for('disponent.tile_detail', filter_key='reserviert') }}"
+     class="stat-card stat-card-link" title="Reservierte Geräte anzeigen">
+    <div class="stat-value stat-orange">{{ reserviert }}</div>
+    <div class="stat-label">Reserviert</div>
+    <div class="stat-hint">→ Liste anzeigen</div>
+  </a>
+
+  <a href="{{ url_for('disponent.tile_detail', filter_key='verfuegbar') }}"
+     class="stat-card stat-card-link" title="Verfügbare Geräte anzeigen">
+    <div class="stat-value stat-green">{{ verfuegbar }}</div>
+    <div class="stat-label">Verfügbar heute</div>
+    <div class="stat-hint">→ Liste anzeigen</div>
+  </a>
+
+</div>
+
+<!-- Quick-nav -->
+<div class="card">
+  <div class="card-title">Schnellzugriff</div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">
+    <a href="{{ url_for('disponent.availability') }}" class="btn btn-primary">Geräteverfügbarkeit</a>
+    <a href="{{ url_for('disponent.devices') }}"      class="btn btn-outline">Geräteübersicht</a>
+  </div>
+</div>
+
+<!-- Unavailable devices table -->
+{% if unavailable_devices %}
+<div class="card">
+  <div class="card-title">Aktuell nicht verfügbare Geräte</div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Gerät</th>
+          <th>Geräte-ID</th>
+          <th>Status</th>
+          <th>Offene Defekte</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in unavailable_devices %}
+        <tr>
+          <td><strong>{{ device.name }}</strong></td>
+          <td><code>{{ device.device_id }}</code></td>
+          <td>
+            {% if device.status == 'Wartung' %}
+              <span class="badge badge-open">In Wartung</span>
+            {% elif device.status == 'Reserviert' %}
+              <span class="badge" style="background:var(--orange,#f59e0b);color:#fff;">Reserviert</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if device.open_defect_count > 0 %}
+              <span class="badge badge-open">{{ device.open_defect_count }}</span>
+            {% else %}
+              <span style="color:var(--gray-400);">–</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <p style="color:var(--gray-500);margin:4px 0;">
+    Alle Geräte sind aktuell verfügbar.
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Clickable stat cards */
+.stat-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .12s, box-shadow .12s;
+  cursor: pointer;
+}
+.stat-card-link:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.13);
+}
+.stat-hint {
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 6px;
+  letter-spacing: .03em;
+}
+</style>
+{% endblock %}

@@ -3,15 +3,18 @@ Defect-reporting blueprint – /report/*
 
 Mobile-first flow:
   GET  /report/<device_id>          – display the defect form
-  POST /report/<device_id>          – submit a defect
+  POST /report/<device_id>          – submit a defect (+ optional photo)
   GET  /report/<device_id>/success  – confirmation page with mailto: link
 """
 
 import logging
+import os
 import urllib.parse
+import uuid
 
 from flask import (
     Blueprint,
+    current_app,
     flash,
     redirect,
     render_template,
@@ -21,11 +24,28 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 
-from models import Defect, DefectCategory, Device, EmailRecipient, db
+from models import Comment, Defect, DefectCategory, Device, EmailRecipient, db
 
 logger = logging.getLogger(__name__)
 
 report_bp = Blueprint("report", __name__, url_prefix="/report")
+
+
+def _save_photo(file) -> str | None:
+    """Validate and persist an uploaded photo. Returns filename or None."""
+    if not file or not file.filename:
+        return None
+    parts = file.filename.rsplit(".", 1)
+    if len(parts) != 2:
+        return None
+    ext = parts[1].lower()
+    if ext not in current_app.config.get("ALLOWED_PHOTO_EXTENSIONS", set()):
+        return None
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    upload_dir = current_app.config["UPLOAD_FOLDER"]
+    os.makedirs(upload_dir, exist_ok=True)
+    file.save(os.path.join(upload_dir, filename))
+    return filename
 
 
 @report_bp.route("/<string:device_id>", methods=["GET", "POST"])
@@ -87,6 +107,7 @@ def defect_form(device_id: str):
         )
         db.session.add(defect)
         device.status = "Wartung"
+
         try:
             db.session.commit()
         except SQLAlchemyError as exc:
@@ -103,6 +124,31 @@ def defect_form(device_id: str):
                 categories=categories,
                 form_data=request.form,
             )
+
+        # Optional: save photo and attach it as the first comment on the defect
+        photo_file = request.files.get("photo")
+        if photo_file and photo_file.filename:
+            try:
+                photo_path = _save_photo(photo_file)
+                if photo_path:
+                    initial_comment = Comment(
+                        defect_id=defect.id,
+                        username=current_user.username,
+                        user_role=current_user.role,
+                        text="Foto bei Defektmeldung",
+                        photo_path=photo_path,
+                    )
+                    db.session.add(initial_comment)
+                    db.session.commit()
+                else:
+                    flash(
+                        "Foto-Format nicht unterstützt (erlaubt: JPG, PNG, GIF, WEBP).",
+                        "warning",
+                    )
+            except (OSError, SQLAlchemyError) as exc:
+                logger.warning("Could not save initial photo for defect %d: %s", defect.id, exc)
+                db.session.rollback()
+                # Photo loss is non-fatal; defect was already saved
 
         flash("Defekt erfolgreich gemeldet.", "success")
         return redirect(url_for("report.defect_success", device_id=device.device_id))

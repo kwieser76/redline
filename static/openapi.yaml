@@ -58,7 +58,7 @@ components:
           example: Vollformatkamera, Body + 24-70mm
         status:
           type: string
-          enum: [Verfügbar, Wartung]
+          enum: [Verfügbar, Wartung, Reserviert]
           example: Verfügbar
         open_defect_count:
           type: integer
@@ -90,7 +90,7 @@ components:
           type: string
         status:
           type: string
-          enum: [Verfügbar, Wartung]
+          enum: [Verfügbar, Wartung, Reserviert]
 
     Defect:
       type: object
@@ -288,7 +288,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [Verfügbar, Wartung]
+            enum: [Verfügbar, Wartung, Reserviert]
           description: Geräte nach Status filtern
       responses:
         "200":

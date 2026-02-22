@@ -222,11 +222,12 @@ class TestBusinessCollectorLabels:
         states = {s.labels["state"] for s in metrics["redline_defects_total"].samples}
         assert states == {"open", "resolved"}
 
-    def test_users_role_labels_are_admin_and_team(self, app):
+    def test_users_role_labels_contain_all_roles(self, app):
         metrics = self._collect(app)
         roles = {s.labels["role"] for s in metrics["redline_users_total"].samples}
         assert "admin" in roles
-        assert "team" in roles
+        assert "disponent" in roles
+        assert "community" in roles
 
     def test_defects_by_category_has_category_label(self, app, defect):
         """After inserting a defect, its category must appear as a label."""

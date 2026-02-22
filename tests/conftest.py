@@ -3,8 +3,8 @@ Shared pytest fixtures for the Redline test suite.
 
 The app is created once per session with an in-memory SQLite database.
 Between tests the autouse clean_db fixture rolls back and removes all
-test-generated rows while preserving the seeded defaults (admin/team_login
-users, default categories, default workshop recipient).
+test-generated rows while preserving the seeded defaults (admin/team_login/
+disponent users, default categories, default workshop recipient).
 """
 
 import base64
@@ -13,7 +13,7 @@ import pytest
 
 from app import create_app
 from config import Config, TestConfig
-from models import db as _db, Defect, DefectCategory, Device, EmailRecipient, User
+from models import Comment, db as _db, Defect, DefectCategory, Device, EmailRecipient, User
 
 
 # --------------------------------------------------------------------------- #
@@ -37,13 +37,17 @@ def clean_db(app):
     yield
     with app.app_context():
         _db.session.rollback()
-        # Child tables first (FK constraints)
+        # Delete child tables before parents (SQLite doesn't enforce FK cascades
+        # during bulk DELETE statements).
+        Comment.query.delete()
         Defect.query.delete()
         Device.query.delete()
         EmailRecipient.query.filter(
             EmailRecipient.email != Config.WORKSHOP_EMAIL
         ).delete()
-        User.query.filter(~User.username.in_(["admin", "team_login"])).delete()
+        User.query.filter(
+            ~User.username.in_(["admin", "team_login", "disponent", "werkstatt"])
+        ).delete()
         DefectCategory.query.filter(
             ~DefectCategory.name.in_(Config.DEFECT_CATEGORIES)
         ).delete()
@@ -86,6 +90,24 @@ def team_client(client):
     """Test client with an active team_login session."""
     client.post(
         "/auth/login", data={"username": "team_login", "password": "team2025"}
+    )
+    return client
+
+
+@pytest.fixture
+def disponent_client(client):
+    """Test client with an active disponent session (seeded default user)."""
+    client.post(
+        "/auth/login", data={"username": "disponent", "password": "disp2025"}
+    )
+    return client
+
+
+@pytest.fixture
+def werkstatt_client(client):
+    """Test client with an active werkstatt session (seeded default user)."""
+    client.post(
+        "/auth/login", data={"username": "werkstatt", "password": "werk2025"}
     )
     return client
 

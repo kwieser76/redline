@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Werkstatt – Defekt #{{ defect.id }}{% endblock %}
+
+{% block content %}
+
+<!-- Device info badge -->
+<div class="device-badge">
+  <div>
+    <div class="device-id">Geräte-ID: {{ defect.device.device_id }}</div>
+    <div class="device-name">{{ defect.device.name }}</div>
+  </div>
+  <span class="badge {% if defect.device.status == 'Verfügbar' %}badge-available{% else %}badge-maintenance{% endif %}">
+    {{ defect.device.status }}
+  </span>
+</div>
+
+<!-- Nav bar -->
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Defekt #{{ defect.id }}</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('werkstatt.dashboard') }}" class="btn btn-sm btn-secondary">← Übersicht</a>
+</div>
+
+<!-- Defect details card -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+    <div>
+      <div style="font-size:18px;font-weight:700;">{{ defect.category }}</div>
+      <div style="font-size:13px;color:var(--gray-600);margin-top:2px;">
+        Gemeldet von <strong>{{ defect.reporter }}</strong> am {{ defect.created_at.strftime('%d.%m.%Y %H:%M') }}
+      </div>
+      <div style="font-size:13px;color:var(--gray-600);">
+        Event: <strong>{{ defect.event_name }}</strong> &middot; Projekt: <strong>{{ defect.project_number }}</strong>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <span class="badge {% if defect.status == 'Offen' %}badge-open{% else %}badge-resolved{% endif %}">
+        {{ defect.status }}
+      </span>
+      <span class="badge badge-ws-{{ defect.werkstatt_status | lower | replace(' ', '-') }}">
+        {{ defect.werkstatt_status }}
+      </span>
+    </div>
+  </div>
+
+  <div style="background:var(--gray-100);border-radius:var(--radius);padding:14px 16px;font-size:15px;line-height:1.6;white-space:pre-wrap;">{{ defect.description }}</div>
+
+  {% if defect.status == 'Behoben' and defect.resolved_at %}
+  <div style="font-size:13px;color:var(--green);margin-top:12px;">
+    Behoben am {{ defect.resolved_at.strftime('%d.%m.%Y %H:%M') }}
+    {% if defect.resolution_notes %} &mdash; {{ defect.resolution_notes }}{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Werkstatt status changer -->
+{% if defect.status == 'Offen' %}
+<div class="card">
+  <div class="card-title">Status ändern</div>
+  <form method="POST" action="{{ url_for('werkstatt.update_status', defect_id=defect.id) }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <select name="werkstatt_status" style="flex:1;min-width:180px;">
+      {% for s in werkstatt_statuses %}
+      <option value="{{ s }}" {% if defect.werkstatt_status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Comment thread -->
+<div class="card">
+  <div class="card-title">Kommentare ({{ defect.comments | length }})</div>
+
+  {% if defect.comments %}
+  <div style="margin-bottom:20px;">
+    {% for comment in defect.comments %}
+    <div class="comment-card">
+      <div class="comment-meta">
+        <span class="comment-author">{{ comment.username }}</span>
+        <span class="comment-role comment-role-{{ comment.user_role }}">{{ comment.user_role }}</span>
+        <span class="comment-time">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+      </div>
+      <div class="comment-text">{{ comment.text }}</div>
+      {% if comment.photo_path %}
+      <div class="comment-photo">
+        <a href="{{ url_for('static', filename='uploads/' + comment.photo_path) }}" target="_blank" rel="noopener">
+          <img src="{{ url_for('static', filename='uploads/' + comment.photo_path) }}"
+               alt="Foto von {{ comment.username }}"
+               class="comment-img"
+               loading="lazy" />
+        </a>
+        <div style="font-size:11px;color:var(--gray-600);margin-top:4px;">Foto öffnen ↗</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p style="color:var(--gray-600);font-size:14px;margin-bottom:20px;">Noch keine Kommentare. Füge den ersten hinzu.</p>
+  {% endif %}
+
+  <!-- Add comment form -->
+  <div style="border-top:1px solid var(--gray-100);padding-top:20px;">
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-600);margin-bottom:12px;">Neuer Kommentar</div>
+    <form method="POST"
+          action="{{ url_for('werkstatt.add_comment', defect_id=defect.id) }}"
+          enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="text">Notiz <span style="color:var(--red)">*</span></label>
+        <textarea id="text" name="text" placeholder="Befund, Maßnahme, Ersatzteile …" maxlength="2000" required></textarea>
+      </div>
+      <div class="form-group">
+        <label for="photo">Foto (optional)</label>
+        <input type="file" id="photo" name="photo" accept="image/*" capture="environment" class="photo-input" />
+        <div style="font-size:12px;color:var(--gray-600);margin-top:4px;">
+          Erlaubt: JPG, PNG, GIF, WEBP · max. 16 MB
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Kommentar hinzufügen</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
