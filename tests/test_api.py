@@ -158,6 +158,15 @@ class TestAPIDeviceCRUD:
         assert resp.status_code == 200
         assert resp.json["status"] == "Wartung"
 
+    def test_update_device_status_to_reserviert(self, client, admin_headers, device):
+        resp = client.patch(
+            f"/api/v1/devices/{device['device_id']}",
+            json={"status": "Reserviert"},
+            headers=admin_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json["status"] == "Reserviert"
+
     def test_update_device_invalid_status_returns_400(self, client, admin_headers, device):
         resp = client.patch(
             f"/api/v1/devices/{device['device_id']}",

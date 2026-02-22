@@ -167,7 +167,7 @@ def update_device(device_id: str):
         return _json_error(f"Device '{device_id}' not found.", 404)
 
     data = request.get_json(silent=True) or {}
-    allowed_statuses = {"Verfügbar", "Wartung"}
+    allowed_statuses = {"Verfügbar", "Wartung", "Reserviert"}
 
     if "name" in data:
         device.name = str(data["name"]).strip() or device.name
