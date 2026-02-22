@@ -269,9 +269,41 @@ Three config classes in `config.py`:
 
 | Class | `FLASK_ENV` | Debug | DB | Validation |
 |-------|------------|-------|----|-----------|
-| `DevelopmentConfig` | `development` | On | SQLite file | Warn only |
+| `DevelopmentConfig` | `development` *(default)* | On | SQLite file | Warn only |
 | `ProductionConfig` | `production` | Off | Any | Hard exit on errors |
-| `TestConfig` | — (passed directly) | Off | `:memory:` | Skipped |
+| `TestConfig` | `testing` | Off | `:memory:` | Skipped |
+
+### Umgebung wechseln – Shortcuts
+
+**Bash / Linux / macOS**
+
+```bash
+# Entwicklung (Standard, kann weggelassen werden)
+FLASK_ENV=development python app.py
+
+# Test-Modus (In-Memory-DB, kein CSRF, keine Mails)
+FLASK_ENV=testing python app.py
+
+# Produktion
+FLASK_ENV=production python app.py
+```
+
+**PowerShell (Windows)**
+
+```powershell
+# Entwicklung
+$env:FLASK_ENV = "development"; python app.py
+
+# Test-Modus
+$env:FLASK_ENV = "testing"; python app.py
+
+# Produktion
+$env:FLASK_ENV = "production"; python app.py
+```
+
+> **Hinweis:** `APP_ENV` existiert **nicht** – nur `FLASK_ENV` wird ausgewertet (`app.py:45`).
+> `TestConfig` wird von pytest direkt übergeben; `FLASK_ENV=testing` ist nur nötig,
+> wenn man die App manuell im Test-Modus starten will.
 
 ### Key Config Values
 
@@ -531,17 +563,50 @@ In Docker, logs are written to stdout/stderr and captured by the Docker logging 
 ### Running Tests
 
 ```bash
-# All tests
+# Alle Tests
 pytest tests/ -v
 
-# With coverage report
+# Mit Coverage-Report (HTML unter htmlcov/index.html)
 pytest tests/ --cov=. --cov-report=html
 
-# Single file
+# Einzelne Datei
 pytest tests/test_nfr.py -v
 
-# Specific test class
+# Bestimmte Klasse
 pytest tests/test_business.py::TestDefectLifecycle -v
+
+# Einzelner Test
+pytest tests/test_api.py::TestApiDevices::test_list_devices -v
+```
+
+### Nützliche pytest-Flags
+
+| Flag | Bedeutung | Wann nützlich |
+|------|-----------|---------------|
+| `-x` | Stop nach erstem Fehler | Beim Debuggen eines Fehlers |
+| `-s` | Stdout nicht unterdrücken | `print()`-Ausgaben sichtbar machen |
+| `-q` | Weniger Output | Schneller Überblick |
+| `--lf` | Nur zuletzt fehlgeschlagene Tests | Nach einem Fix schnell prüfen |
+| `--ff` | Fehlgeschlagene zuerst, dann Rest | Vollständiger Lauf mit Priorisierung |
+| `-k "keyword"` | Tests nach Name filtern | Nur relevante Tests laufen lassen |
+| `--tb=short` | Kurze Traceback-Ausgabe | Weniger Rauschen bei vielen Fehlern |
+| `--tb=no` | Kein Traceback | Nur Übersicht, welche Tests scheitern |
+| `--co` | Nur auflisten, nicht ausführen | Prüfen welche Tests ausgewählt werden |
+
+**Kombinations-Beispiele**
+
+```bash
+# Nur Tests mit "email" im Namen, bei erstem Fehler stoppen, Print sichtbar
+pytest tests/ -k "email" -x -s
+
+# Schneller Check: letzter fehlgeschlagener Test, kurzes Traceback
+pytest --lf --tb=short
+
+# Coverage nur für einen bestimmten Modul
+pytest tests/test_api.py --cov=api --cov-report=term-missing
+
+# Alle Tests außer langsamen NFR-Tests
+pytest tests/ --ignore=tests/test_nfr.py -q
 ```
 
 ---
