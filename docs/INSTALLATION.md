@@ -225,10 +225,11 @@ Die App ist bereit, wenn du folgendes siehst:
 
 #### Standard-Zugangsdaten (sofort nach dem ersten Login ändern!):
 
-| Benutzername | Passwort   | Rolle         |
-|--------------|------------|---------------|
-| `admin`      | `admin123` | Administrator |
-| `team_login` | `team2025` | Techniker     |
+| Benutzername | Passwort   | Rolle         | Startseite nach Login |
+|--------------|------------|---------------|-----------------------|
+| `admin`      | `admin123` | Administrator | `/admin/` |
+| `team_login` | `team2025` | Techniker     | `/admin/all_defects` |
+| `disponent`  | `disp2025` | Disponent     | `/disponent/` |
 
 **App stoppen:** `Strg + C` in der Kommandozeile drücken.
 
@@ -551,16 +552,28 @@ On the **first startup** the application automatically:
 1. Creates all database tables (`db.create_all()`)
 2. Creates default users:
 
-   | Username | Password | Role |
-   |----------|----------|------|
-   | `admin` | `admin123` | Administrator |
-   | `team_login` | `team2025` | Community user (technicians) |
+   | Username | Password | Role | First login redirect |
+   |----------|----------|------|---------------------|
+   | `admin` | `admin123` | Administrator | `/admin/` |
+   | `team_login` | `team2025` | Community user (technicians) | `/admin/all_defects` |
+   | `disponent` | `disp2025` | Dispatcher (read-only ops view) | `/disponent/` |
 
 3. Seeds 9 default defect categories
 4. Adds `WORKSHOP_EMAIL` as the first email recipient
 
-> **Security:** Change the default passwords immediately after the first login.
-> Admin → Benutzerverwaltung → change_password
+> **Security:** Change **all three** default passwords immediately after the first login.
+> Admin → Benutzerverwaltung → Passwort ändern
+
+### Disponent-Rolle
+
+The **Disponent** (dispatcher) role provides a separate read-only operations dashboard at `/disponent/`. Disponnents can:
+
+- View 4 real-time stat tiles (total / unavailable / reserved / available devices)
+- Click tiles to see filtered device lists
+- View and export the device-availability report
+- Browse the full device list (read-only)
+
+Disponnents **cannot** access user management, defect categories, email recipients, or any other admin-only pages. Admins create disponent users via the Admin → Benutzerverwaltung form (check "Disponent-Rechte").
 
 ---
 
@@ -759,6 +772,33 @@ flask --app app db downgrade
 ```
 
 > **Note:** The development shortcut `db.create_all()` in `create_app()` creates tables that don't yet exist but does **not** apply schema changes to existing tables. For schema changes on an existing database always use `flask db migrate` + `flask db upgrade`.
+
+### Manuelle Migration: `users.is_disponent` (bestehende Instanzen)
+
+Wenn du von einer Redline-Version **vor** der Disponent-Rolle auf diese Version aktualisierst, fehlt der `is_disponent`-Spalte in deiner vorhandenen Datenbank. Führe einmalig aus:
+
+**SQLite (Direktzugriff mit Python):**
+```python
+python -c "
+import sqlite3
+conn = sqlite3.connect('redline.db')  # ggf. Pfad anpassen
+cols = [r[1] for r in conn.execute('PRAGMA table_info(users)').fetchall()]
+if 'is_disponent' not in cols:
+    conn.execute('ALTER TABLE users ADD COLUMN is_disponent BOOLEAN NOT NULL DEFAULT 0')
+    conn.commit()
+    print('Migration OK')
+else:
+    print('Spalte bereits vorhanden')
+conn.close()
+"
+```
+
+**PostgreSQL:**
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_disponent BOOLEAN NOT NULL DEFAULT FALSE;
+```
+
+Danach die App normal neu starten – der Seed legt den Default-Disponent-Benutzer automatisch an.
 
 ---
 

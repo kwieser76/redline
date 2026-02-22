@@ -33,18 +33,18 @@
 Redline is a **mobile-first, QR-code-based defect reporting system** for event engineering.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        USERS                                │
-│                                                             │
-│  Technician (iPhone)    Admin (PC-Browser)  Ops (Browser)  │
-│  ┌──────────────────┐   ┌────────────────┐  ┌────────────┐ │
-│  │  Scan QR Code    │   │ Admin Dashboard│  │  Grafana   │ │
-│  │  Fill Form       │   │ Manage Devices │  │ Dashboard  │ │
-│  │  Send mailto:    │   │ Resolve Defects│  │            │ │
-│  └────────┬─────────┘   └──────┬─────────┘  └─────┬──────┘ │
-└───────────┼────────────────────┼─────────────────┼────────┘
-            │ HTTPS              │ HTTPS            │ HTTP
-            ▼                    ▼                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                               USERS                                      │
+│                                                                          │
+│ Technician (iPhone) Admin (PC-Browser) Disponent (Browser) Ops(Browser) │
+│ ┌─────────────────┐ ┌───────────────┐  ┌─────────────────┐ ┌──────────┐ │
+│ │  Scan QR Code   │ │Admin Dashboard│  │ Disp. Dashboard │ │ Grafana  │ │
+│ │  Fill Form      │ │Manage Devices │  │ Tile Stats      │ │Dashboard │ │
+│ │  Send mailto:   │ │Resolve Defects│  │ Availability    │ │          │ │
+│ └───────┬─────────┘ └──────┬────────┘  └───────┬─────────┘ └────┬─────┘ │
+└─────────┼──────────────────┼───────────────────┼────────────────┼───────┘
+         │ HTTPS           │ HTTPS       │ HTTPS        │ HTTP
+         ▼                ▼             ▼              ▼
 ┌─────────────────────────┐   ┌─────────┐  ┌────────────────┐
 │    Flask Application    │   │Prometheus│  │    Grafana     │
 │                         │◄──│ scrapes │  │ (provisioned)  │
@@ -96,7 +96,8 @@ Redline-/
 │   ├── __init__.py
 │   ├── auth.py             # /auth/login, /auth/logout
 │   ├── report.py           # /report/<device_id>
-│   └── admin.py            # /admin/* (all admin routes + admin_required)
+│   ├── admin.py            # /admin/* (all admin routes + admin_required)
+│   └── disponent.py        # /disponent/* (dispatcher UI + disponent_required)
 │
 ├── static/
 │   ├── css/style.css       # Redline brand CSS (black/red, Barlow Condensed)
@@ -112,14 +113,16 @@ Redline-/
 │   ├── defect_success.html # Success page with mailto: button
 │   ├── error.html          # Generic error page (403, 404, 429)
 │   ├── api_docs.html       # Swagger UI wrapper
-│   └── admin/              # Admin dashboard templates (9 files)
+│   ├── admin/              # Admin dashboard templates (9 files)
+│   └── disponent/          # Dispatcher UI templates (4 files)
 │
 ├── tests/
-│   ├── conftest.py         # Session fixtures, TestConfig, clean_db
+│   ├── conftest.py         # Session fixtures, TestConfig, clean_db, disponent_client
 │   ├── test_auth.py        # Authentication flow
 │   ├── test_models.py      # ORM model unit tests
 │   ├── test_api.py         # REST API endpoint tests
 │   ├── test_admin.py       # Admin route tests
+│   ├── test_disponent.py   # Disponent role + /disponent/* routes (49 tests)
 │   ├── test_report.py      # Defect form tests
 │   ├── test_notifications.py
 │   ├── test_nfr.py         # Non-functional requirements tests
@@ -154,6 +157,7 @@ create_app(config_class)
     ├── register_blueprint(auth_bp)
     ├── register_blueprint(report_bp)
     ├── register_blueprint(admin_bp)
+    ├── register_blueprint(disponent_bp)
     ├── register_blueprint(api_bp)
     ├── standalone routes (/, /api/docs)
     ├── error handlers (403, 404, 429)
@@ -196,9 +200,11 @@ users
   id           PK  INTEGER
   username          VARCHAR(80)   UNIQUE  NOT NULL  INDEX
   password_hash     VARCHAR(255)          NOT NULL
-  is_admin          BOOLEAN       DEFAULT FALSE
-  is_community      BOOLEAN       DEFAULT FALSE
+  is_admin          BOOLEAN       DEFAULT FALSE          ← role: admin
+  is_disponent      BOOLEAN       DEFAULT FALSE          ← role: disponent
+  is_community      BOOLEAN       DEFAULT FALSE          ← role: community
   created_at        DATETIME      DEFAULT UTC NOW
+  [role]            property      "admin"|"disponent"|"community"  (not stored)
 
 devices
   id           PK  INTEGER
@@ -241,8 +247,9 @@ defect_categories
 
 | Model | Field | Values |
 |-------|-------|--------|
-| `Device` | `status` | `Verfügbar` · `Wartung` |
+| `Device` | `status` | `Verfügbar` · `Wartung` · `Reserviert` |
 | `Defect` | `status` | `Offen` · `Behoben` |
+| `User` | `role` *(property)* | `admin` · `disponent` · `community` |
 
 ### Cascade Delete
 
@@ -342,7 +349,16 @@ The factory calls `validate()` before the first request. `ProductionConfig` hard
 |------|-----------|--------|
 | Any authenticated | `@login_required` | Report form, basic views |
 | Admin | `@admin_required` | All `/admin/*` routes |
+| Disponent | `@disponent_required` | All `/disponent/*` routes (admins also allowed) |
 | Admin (API) | `@_require_auth(admin_only=True)` | Write/delete API endpoints |
+
+**Role flags** (mutually exclusive in practice, `is_admin` takes precedence in `role` property):
+
+| `is_admin` | `is_disponent` | `User.role` | Login redirect |
+|-----------|---------------|-------------|----------------|
+| `True` | any | `"admin"` | `/admin/` |
+| `False` | `True` | `"disponent"` | `/disponent/` |
+| `False` | `False` | `"community"` | `/admin/all_defects` |
 
 ### Password Storage
 
@@ -379,7 +395,18 @@ See [Section 11](#11-rate-limiting).
 |-----------|--------|--------|
 | `auth_bp` | `/auth` | `GET/POST /login`, `GET /logout` |
 | `report_bp` | `/report` | `GET/POST /<device_id>`, `GET /<device_id>/success` |
-| `admin_bp` | `/admin` | Dashboard, devices, QR, history, repair, users, defects, event-report, recipients, categories |
+| `admin_bp` | `/admin` | Dashboard, devices, QR, history, repair, users, defects, event-report, recipients, categories, availability |
+| `disponent_bp` | `/disponent` | Dashboard, tile-detail, devices (read-only), availability, CSV export |
+
+**Disponent routes detail:**
+
+| Route | Auth | Purpose |
+|-------|------|---------|
+| `GET /disponent/` | `@disponent_required` | Dashboard with 4 stat tiles |
+| `GET /disponent/kachel/<key>` | `@disponent_required` | Filtered device list (`alle` / `verfuegbar` / `nicht-verfuegbar` / `reserviert`) |
+| `GET /disponent/geraete` | `@disponent_required` | Read-only device overview |
+| `GET /disponent/verfuegbarkeit` | `@disponent_required` | Date-range availability report |
+| `GET /disponent/verfuegbarkeit/export` | `@disponent_required` | CSV export of availability report |
 
 ### REST API
 
@@ -541,6 +568,7 @@ In Docker, logs are written to stdout/stderr and captured by the Docker logging 
         ├──────────────────────┤
         │   test_api           │  REST API contract (80+ tests)
         │   test_admin         │  Admin route tests
+        │   test_disponent     │  Disponent role + /disponent/* (49 tests)
         │   test_report        │  Defect form tests
         │   test_auth          │  Auth flow tests
         │   test_notifications │  Email send tests
@@ -548,6 +576,21 @@ In Docker, logs are written to stdout/stderr and captured by the Docker logging 
         │   test_models        │  ORM unit tests (35 tests)
         └──────────────────────┘
 ```
+
+**test_disponent.py** coverage classes:
+
+| Class | Tests | What it verifies |
+|-------|-------|-----------------|
+| `TestDisponentAccessControl` | 4 | unauthenticated → 302, community → 403, disponent/admin → 200 |
+| `TestDisponentLoginRouting` | 2 | POST /auth/login → /disponent/ for disponnents, not for admins |
+| `TestDisponentCannotAccessAdmin` | 1 | All /admin/* return 403 for disponent |
+| `TestDisponentDashboard` | 7 | Tiles, counts, table, nav, empty state |
+| `TestTileDetail` | 7 | Filter keys, content, 404 for unknown key, filter pills |
+| `TestDisponentDevices` | 5 | Read-only list, no add/delete forms, status badges |
+| `TestDisponentAvailability` | 7 | Date filter, category filter, empty state, bad dates |
+| `TestDisponentCsvExport` | 6 | Content-type, header row, data, filename, access block |
+| `TestUserModel` | 7 | `role` property, seeded user, password, repr |
+| `TestAdminCreatesDisponentUser` | 3 | Admin form creates disponent, admin flag wins, new user can log in |
 
 ### Key Design Decisions
 
@@ -577,6 +620,12 @@ pytest tests/test_business.py::TestDefectLifecycle -v
 
 # Einzelner Test
 pytest tests/test_api.py::TestApiDevices::test_list_devices -v
+
+# Nur Disponent-Tests
+pytest tests/test_disponent.py -v
+
+# Access-Control-Tests über alle Blueprints
+pytest tests/ -k "Access" -v
 ```
 
 ### Nützliche pytest-Flags
