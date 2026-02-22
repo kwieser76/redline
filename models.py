@@ -3,8 +3,9 @@ Redline – SQLAlchemy database models.
 
 All timestamps are stored in UTC.  Status fields use German values to match
 the UI and FileMaker integration:
-  Device.status   : "Verfügbar" | "Wartung"
+  Device.status   : "Verfügbar" | "Wartung" | "Reserviert"
   Defect.status   : "Offen"     | "Behoben"
+  User roles      : is_admin=True | is_disponent=True | (none → community)
 """
 
 from datetime import datetime, timezone
@@ -23,10 +24,20 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    is_disponent = db.Column(db.Boolean, default=False, nullable=False)
     is_community = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
+
+    @property
+    def role(self) -> str:
+        """Human-readable role string for templates and logging."""
+        if self.is_admin:
+            return "admin"
+        if self.is_disponent:
+            return "disponent"
+        return "community"
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -35,7 +46,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self) -> str:
-        return f"<User {self.username}>"
+        return f"<User {self.username} role={self.role}>"
 
 
 class Device(db.Model):
@@ -50,7 +61,7 @@ class Device(db.Model):
         default="Verfügbar",
         nullable=False,
         index=True,
-    )  # "Verfügbar" | "Wartung"
+    )  # "Verfügbar" | "Wartung" | "Reserviert"
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

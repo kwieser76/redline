@@ -124,11 +124,13 @@ def create_app(config_class=None) -> Flask:
     from routes.auth import auth_bp
     from routes.report import report_bp
     from routes.admin import admin_bp
+    from routes.disponent import disponent_bp
     from api import api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(report_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(disponent_bp)
     app.register_blueprint(api_bp)
 
     # ---------------------------------------------------------------------- #
@@ -164,6 +166,8 @@ def create_app(config_class=None) -> Flask:
         if current_user.is_authenticated:
             if current_user.is_admin:
                 return redirect(url_for("admin.dashboard"))
+            if current_user.is_disponent:
+                return redirect(url_for("disponent.dashboard"))
             return redirect(url_for("admin.all_defects"))
         return redirect(url_for("auth.login"))
 
@@ -237,6 +241,15 @@ def _seed_db() -> None:
         logger.warning(
             "Created default team_login user (team_login / team2025). "
             "Change this password regularly."
+        )
+
+    if not User.query.filter_by(username="disponent").first():
+        disp = User(username="disponent", is_disponent=True)
+        disp.set_password("disp2025")
+        db.session.add(disp)
+        logger.warning(
+            "Created default disponent user (disponent / disp2025). "
+            "CHANGE THIS PASSWORD before going live!"
         )
 
     if DefectCategory.query.count() == 0:

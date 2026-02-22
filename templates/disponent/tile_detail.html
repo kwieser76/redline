@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">{{ title }}</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('disponent.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
+</div>
+
+<!-- Filter pills -->
+<div class="card" style="padding-top:14px;padding-bottom:14px;">
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+    <span style="font-size:13px;color:var(--gray-500);margin-right:4px;">Filter:</span>
+    {% set filters = [
+      ('alle',            'Alle Geräte'),
+      ('verfuegbar',      'Verfügbar'),
+      ('nicht-verfuegbar','Nicht verfügbar'),
+      ('reserviert',      'Reserviert'),
+    ] %}
+    {% for key, label in filters %}
+    <a href="{{ url_for('disponent.tile_detail', filter_key=key) }}"
+       class="btn btn-sm {% if filter_key == key %}btn-primary{% else %}btn-outline{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-subtitle" style="margin-bottom:12px;">
+    {{ devices | length }} Gerät{{ 'e' if devices | length != 1 else '' }}
+  </div>
+
+  {% if devices %}
+  <div class="table-wrapper">
+    <table id="tile-table">
+      <thead>
+        <tr>
+          <th data-sort="text" style="cursor:pointer;">Gerät ↕</th>
+          <th data-sort="text">Geräte-ID</th>
+          <th>Beschreibung</th>
+          <th data-sort="text" style="cursor:pointer;">Status ↕</th>
+          <th>Offene Defekte</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in devices %}
+        <tr>
+          <td><strong>{{ device.name }}</strong></td>
+          <td><code>{{ device.device_id }}</code></td>
+          <td style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+              title="{{ device.description }}">
+            {{ device.description or '–' }}
+          </td>
+          <td>
+            {% if device.status == 'Verfügbar' %}
+              <span class="badge badge-resolved">Verfügbar</span>
+            {% elif device.status == 'Wartung' %}
+              <span class="badge badge-open">In Wartung</span>
+            {% elif device.status == 'Reserviert' %}
+              <span class="badge" style="background:var(--orange,#f59e0b);color:#fff;">Reserviert</span>
+            {% else %}
+              {{ device.status }}
+            {% endif %}
+          </td>
+          <td>
+            {% if device.open_defect_count > 0 %}
+              <span class="badge badge-open">{{ device.open_defect_count }}</span>
+            {% else %}
+              <span style="color:var(--gray-400);">0</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:var(--gray-500);margin:4px 0;">
+    Keine Geräte in dieser Kategorie.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const table = document.getElementById('tile-table');
+  if (!table) return;
+  const headers = table.querySelectorAll('th[data-sort]');
+  let sortCol = -1, sortAsc = true;
+  headers.forEach(function(th, idx){
+    th.addEventListener('click', function(){
+      if (sortCol === idx) { sortAsc = !sortAsc; } else { sortCol = idx; sortAsc = true; }
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort(function(a, b){
+        const va = a.children[idx].textContent.trim();
+        const vb = b.children[idx].textContent.trim();
+        const cmp = va.localeCompare(vb, 'de', {numeric: true});
+        return sortAsc ? cmp : -cmp;
+      });
+      rows.forEach(function(r){ tbody.appendChild(r); });
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -85,7 +85,7 @@ class _BusinessCollector:
                     "Devices grouped by status.",
                     labels=["status"],
                 )
-                for status_val in ["Verfügbar", "Wartung"]:
+                for status_val in ["Verfügbar", "Wartung", "Reserviert"]:
                     dsf.add_metric(
                         [status_val],
                         float(Device.query.filter_by(status=status_val).count()),
@@ -147,7 +147,14 @@ class _BusinessCollector:
                     ["admin"], float(User.query.filter_by(is_admin=True).count())
                 )
                 uf.add_metric(
-                    ["team"], float(User.query.filter_by(is_admin=False).count())
+                    ["disponent"],
+                    float(User.query.filter_by(is_disponent=True).count()),
+                )
+                uf.add_metric(
+                    ["community"],
+                    float(
+                        User.query.filter_by(is_admin=False, is_disponent=False).count()
+                    ),
                 )
                 yield uf
 
