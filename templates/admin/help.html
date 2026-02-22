@@ -217,4 +217,35 @@
   </div>
 </div>
 
+{% if show_debug_info %}
+<!-- System-Info (nur in Entwicklungsumgebung sichtbar) -->
+<div class="card" style="border-left:3px solid #f59e0b;">
+  <div class="card-title" style="display:flex;align-items:center;gap:10px;">
+    System-Info
+    <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.06em;">TEST-UMGEBUNG</span>
+  </div>
+  <div class="card-subtitle" style="color:#92400e;">Diese Karte ist nur in der Entwicklungsumgebung sichtbar (SHOW_DEBUG_INFO = True). In Produktion wird sie automatisch ausgeblendet.</div>
+  <table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;">
+    <tbody>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:8px 12px;width:180px;color:var(--gray-500);">Umgebung</td>
+        <td style="padding:8px 12px;"><code>{{ "DEBUG" if config.DEBUG else "PRODUCTION" }}</code></td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:8px 12px;color:var(--gray-500);">Version</td>
+        <td style="padding:8px 12px;"><code>{{ app_version }}</code></td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:8px 12px;color:var(--gray-500);">APP_BASE_URL</td>
+        <td style="padding:8px 12px;"><code>{{ config.APP_BASE_URL }}</code></td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;color:var(--gray-500);">Datenbankpfad</td>
+        <td style="padding:8px 12px;"><code>{{ app_db_path }}</code></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 {% endblock %}

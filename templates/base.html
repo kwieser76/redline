@@ -25,6 +25,9 @@
           <span class="brand-tagline">Event Engineering</span>
         </div>
       </a>
+      {% if config.DEBUG %}
+      <span style="display:inline-flex;align-items:center;padding:2px 8px;margin-left:10px;background:#f59e0b;color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;border-radius:4px;line-height:1.6;vertical-align:middle;">TEST</span>
+      {% endif %}
     </div>
     {% if current_user.is_authenticated %}
     <nav class="navbar-nav">

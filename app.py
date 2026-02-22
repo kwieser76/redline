@@ -106,7 +106,17 @@ def create_app(config_class=None) -> Flask:
 
     @app.context_processor
     def inject_app_version():
-        return {"app_version": APP_VERSION}
+        db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        db_path = (
+            db_uri.replace("sqlite:///", "")
+            if db_uri.startswith("sqlite:///")
+            else db_uri
+        )
+        return {
+            "app_version": APP_VERSION,
+            "show_debug_info": app.config.get("SHOW_DEBUG_INFO", False),
+            "app_db_path": db_path,
+        }
 
     # ---------------------------------------------------------------------- #
     #  Blueprints                                                              #
