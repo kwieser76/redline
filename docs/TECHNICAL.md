@@ -24,6 +24,7 @@
 14. [Deployment Architecture](#14-deployment-architecture)
 15. [Non-Functional Requirements](#15-non-functional-requirements)
 16. [Observability](#16-observability)
+17. [Vollständige Konfigurationsreferenz](#17-vollständige-konfigurationsreferenz)
 
 ---
 
@@ -756,3 +757,128 @@ The dashboard (`grafana/dashboards/redline.json`) is auto-loaded by the provisio
 | `TestBusinessCollectorResilience` | 4 | No crash on missing app, no double-register |
 | `TestPrometheusGauges` | 4 | Gauges writable; `app_info` is correct type |
 | `TestMetricsTestIsolation` | 4 | `TESTING=True`, no `/metrics` route, `/healthz` works |
+
+---
+
+## 17. Vollständige Konfigurationsreferenz
+
+Diese Tabellen listen **alle** konfigurierbaren Variablen auf – wo sie gesetzt werden, welchen Standardwert sie haben und was sich bei einer Änderung auswirkt.
+
+### Wo wird was gesetzt?
+
+| Methode | Wann verwenden |
+|---------|---------------|
+| **`.env`-Datei** | Betriebsgeheimnisse, URL-Einstellungen, SMTP-Zugangsdaten – alles, was sich zwischen Umgebungen ändert oder vertraulich ist. Wird nie eingecheckt. |
+| **`config.py`** | Strukturelle Flags (z. B. `SHOW_DEBUG_INFO`, `SQLALCHEMY_ECHO`), die direkt an eine Config-Klasse gebunden sind. Werden im Code gepflegt. |
+| **`docker-compose.yml`** | Port-Mappings für Docker-Deployments (`APP_PORT`, `PROMETHEUS_PORT`, `GRAFANA_PORT`). |
+
+---
+
+### Gruppe 1 – Flask-Kern
+
+| Variable | Wo setzen | Standard | Auswirkung | Pflicht? |
+|----------|-----------|----------|------------|---------|
+| `SECRET_KEY` | `.env` | `change-me-in-production-secret-key` | Signiert Session-Cookies und CSRF-Tokens. Wird der Default-Wert im Production-Modus erkannt, bricht die App beim Start ab. | **Ja** – immer ändern |
+| `FLASK_ENV` | Umgebungsvariable / Startskript | `development` | Wählt die Config-Klasse: `development` → `DevelopmentConfig`, `production` → `ProductionConfig`. Steuert Debug-Modus, SQL-Echo und SHOW_DEBUG_INFO. | Empfohlen |
+
+---
+
+### Gruppe 2 – Datenbank
+
+| Variable | Wo setzen | Standard | Auswirkung | Pflicht? |
+|----------|-----------|----------|------------|---------|
+| `DATABASE_URL` | `.env` | `sqlite:///redline.db` | SQLAlchemy-Verbindungs-URI. SQLite für Entwicklung und kleine Deployments; PostgreSQL für Produktion mit mehreren Workers. Format: `postgresql://user:pw@host:5432/db` | Nein (SQLite ist Default) |
+| `SQLALCHEMY_ECHO` | `config.py` → `DevelopmentConfig` | `False` | Wenn `True`: Jede SQL-Abfrage wird in der Konsole geloggt. Nur für Entwicklung sinnvoll – verlangsamt die App und produziert viel Ausgabe. | Nein |
+
+---
+
+### Gruppe 3 – Öffentliche URL & QR-Codes
+
+| Variable | Wo setzen | Standard | Auswirkung | Pflicht? |
+|----------|-----------|----------|------------|---------|
+| `APP_BASE_URL` | `.env` | `http://localhost:5000` | Basis-URL, die in alle QR-Codes eingebettet wird. Muss auf die öffentlich erreichbare Adresse des Servers zeigen. Im Production-Modus muss sie mit `https://` beginnen und darf nicht `localhost` enthalten – sonst bricht der Start ab. | **Ja** in Produktion |
+
+> **Beispiel:** `APP_BASE_URL=http://192.168.178.133:5000` für lokale iPhone-Tests; `APP_BASE_URL=https://redline.firma.com` in Produktion.
+
+---
+
+### Gruppe 4 – E-Mail & SMTP
+
+> SMTP wird nur für den **Ereignisbericht** benötigt. Defektmeldungen per QR-Code nutzen `mailto:`-Links und brauchen keinen SMTP-Server.
+
+| Variable | Wo setzen | Standard | Auswirkung | Pflicht? |
+|----------|-----------|----------|------------|---------|
+| `WORKSHOP_EMAIL` | `.env` | `werkstatt@redline.local` | Wird beim ersten Start als Standard-E-Mail-Empfänger in die Datenbank eingetragen (Seed-Daten). Danach nur noch über den Admin-Bereich verwaltbar. | Empfohlen |
+| `MAIL_SERVER` | `.env` | `smtp.gmail.com` | Hostname des SMTP-Servers für den Ereignisbericht-Versand. | Ja (für Ereignisbericht) |
+| `MAIL_PORT` | `.env` | `587` | SMTP-Port. Üblich: `587` (TLS/STARTTLS), `465` (SSL), `25` (unverschlüsselt). | Ja (für Ereignisbericht) |
+| `MAIL_USE_TLS` | `.env` | `true` | Aktiviert STARTTLS-Verschlüsselung. Auf `false` setzen nur bei Port 465 (SSL) oder internen Servern ohne TLS. | Empfohlen |
+| `MAIL_USERNAME` | `.env` | *(leer)* | Benutzername für SMTP-Authentifizierung. Bei Gmail: die vollständige Gmail-Adresse. | Ja (für Ereignisbericht) |
+| `MAIL_PASSWORD` | `.env` | *(leer)* | SMTP-Passwort. Bei Gmail: ein **App-Passwort** (nicht das Google-Konto-Passwort). | Ja (für Ereignisbericht) |
+| `MAIL_DEFAULT_SENDER` | `.env` | `noreply@redline.local` | Absender-Adresse in ausgehenden E-Mails. Sollte zur Sender-Domain des SMTP-Servers passen, um Spam-Filter zu vermeiden. | Nein |
+
+---
+
+### Gruppe 5 – FileMaker-Integration
+
+> Die FileMaker-Integration ist vollständig optional. Wird `FILEMAKER_PASSWORD` leer gelassen, läuft der Client im **POC-Modus**: Alle Operationen werden geloggt, aber keine Netzwerkverbindung hergestellt.
+
+| Variable | Wo setzen | Standard | Auswirkung | Pflicht? |
+|----------|-----------|----------|------------|---------|
+| `FILEMAKER_HOST` | `.env` | `https://filemaker.redline.local` | Basis-URL der FileMaker Data API. | Nein |
+| `FILEMAKER_DATABASE` | `.env` | `RedlineDB` | Name der FileMaker-Datenbank. | Nein |
+| `FILEMAKER_USERNAME` | `.env` | `admin` | FileMaker-Benutzer mit API-Zugriff. | Nein |
+| `FILEMAKER_PASSWORD` | `.env` | *(leer)* | FileMaker-Passwort. **Leer lassen = POC-Modus** (empfohlen, wenn kein FileMaker verfügbar). | Nein |
+
+---
+
+### Gruppe 6 – Rate Limiting
+
+| Variable | Wo setzen | Standard | Auswirkung | Pflicht? |
+|----------|-----------|----------|------------|---------|
+| `RATELIMIT_ENABLED` | `config.py` | `True` (Dev/Prod), `False` (Test) | Schaltet Flask-Limiter global ein oder aus. In Tests immer `False`, um Throttling zu verhindern. | Nein |
+| `RATELIMIT_STORAGE_URL` | `.env` | `memory://` | Backend für Rate-Limit-Counter. `memory://` = nur im aktuellen Prozess (nicht geeignet für mehrere Gunicorn-Worker). Bei mehreren Workers: `redis://redis:6379/0` | Nein (bei Single-Worker) |
+| `RATELIMIT_DEFAULT` | `config.py` | `200 per hour;50 per minute` | Standard-Limit für alle Endpunkte. Login-Endpunkt hat ein eigenes, strengeres Limit (`10/minute`). | Nein |
+
+---
+
+### Gruppe 7 – Entwickler-Flags (config.py)
+
+Diese Flags werden direkt in `config.py` gepflegt und nicht per `.env` gesetzt. Sie steuern das Verhalten in der Entwicklungsumgebung.
+
+| Variable | Klasse | Standard | Auswirkung |
+|----------|--------|----------|------------|
+| `DEBUG` | `DevelopmentConfig`: `True` · `ProductionConfig`: `False` · `TestConfig`: `False` | — | Flask-Debug-Modus: Hot-Reload, detaillierte Fehlerseiten, **TEST-Badge in der Navbar**. Niemals in Produktion aktivieren. |
+| `SHOW_DEBUG_INFO` | `DevelopmentConfig`: `True` · `ProductionConfig`: `False` · `TestConfig`: `False` | — | Zeigt die **System-Info-Karte** am Ende der Hilfe-Seite (Umgebung, Version, APP_BASE_URL, Datenbankpfad). Kann in `config.py` auch temporär in Produktion auf `True` gesetzt werden, um Konfigurationsprobleme zu debuggen. |
+| `SQLALCHEMY_ECHO` | `DevelopmentConfig`: `False` | `False` | Wenn auf `True` gesetzt: alle SQL-Statements in die Konsole ausgeben. Nützlich beim Debuggen von ORM-Abfragen. |
+| `TESTING` | `TestConfig`: `True` | `False` | Deaktiviert Prometheus-Metriken, überspringt `config.validate()`, aktiviert `MAIL_SUPPRESS_SEND`. Nur für pytest. |
+
+---
+
+### Gruppe 8 – Docker & Observability
+
+Diese Variablen werden in `.env` gesetzt und von `docker-compose.yml` verwendet.
+
+| Variable | Wo setzen | Standard | Auswirkung | Pflicht? |
+|----------|-----------|----------|------------|---------|
+| `GRAFANA_ADMIN_PASSWORD` | `.env` | `change-me-grafana-password` | Passwort für den Grafana-Admin-Benutzer. Muss vor dem ersten Start geändert werden. | **Ja** (Docker) |
+| `APP_PORT` | `.env` | `8000` | Externer Docker-Port für die Flask-App. Relevant wenn Port 8000 bereits belegt ist. | Nein |
+| `PROMETHEUS_PORT` | `.env` | `9090` | Externer Docker-Port für das Prometheus-UI. | Nein |
+| `GRAFANA_PORT` | `.env` | `3000` | Externer Docker-Port für das Grafana-Dashboard. | Nein |
+
+---
+
+### Schnell-Referenz: Was ändere ich wofür?
+
+| Ich möchte … | Variable(n) | Wo |
+|-------------|-------------|-----|
+| App sicher machen (Session-Schutz) | `SECRET_KEY` | `.env` |
+| QR-Codes für iPhones im WLAN nutzbar machen | `APP_BASE_URL` | `.env` |
+| Ereignisberichte per E-Mail senden | `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | `.env` |
+| Standard-Werkstatt-E-Mail setzen | `WORKSHOP_EMAIL` | `.env` |
+| PostgreSQL statt SQLite verwenden | `DATABASE_URL` | `.env` |
+| Alle SQL-Abfragen in der Konsole sehen | `SQLALCHEMY_ECHO = True` | `config.py` → `DevelopmentConfig` |
+| System-Info-Karte in der Hilfe anzeigen | `SHOW_DEBUG_INFO = True` | `config.py` (gewünschte Config-Klasse) |
+| FileMaker-Sync aktivieren | `FILEMAKER_HOST`, `FILEMAKER_DATABASE`, `FILEMAKER_USERNAME`, `FILEMAKER_PASSWORD` | `.env` |
+| Rate Limiting für mehrere Worker konfigurieren | `RATELIMIT_STORAGE_URL=redis://redis:6379/0` | `.env` |
+| Grafana-Passwort setzen | `GRAFANA_ADMIN_PASSWORD` | `.env` |
+| Docker-Ports ändern (wenn belegt) | `APP_PORT`, `PROMETHEUS_PORT`, `GRAFANA_PORT` | `.env` |
