@@ -240,7 +240,16 @@ def _seed_db() -> None:
             db.session.add(EmailRecipient(name="Werkstatt", email=workshop_email))
             logger.info("Seeded default email recipient: %s", workshop_email)
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.error(
+            "Datenbank-Seed fehlgeschlagen: %s. "
+            "Standarddaten (Admin-Benutzer, Kategorien) wurden möglicherweise "
+            "nicht angelegt.",
+            exc,
+        )
 
 
 # --------------------------------------------------------------------------- #

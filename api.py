@@ -25,12 +25,16 @@ GET    /api/v1/events/<project_number>     Defects for one event
 
 import functools
 import io
+import logging
 from datetime import datetime, timezone
 
 import qrcode
 from flask import Blueprint, g, jsonify, request, send_file
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from models import Defect, Device, User, db
+
+logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
@@ -132,7 +136,15 @@ def create_device():
 
     device = Device(device_id=device_id, name=name, description=description)
     db.session.add(device)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return _json_error(f"device_id '{device_id}' already exists.", 409)
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("DB error creating device: %s", exc)
+        return _json_error("Database error – could not create device.", 500)
     return jsonify(_device_to_dict(device)), 201
 
 
@@ -168,7 +180,12 @@ def update_device(device_id: str):
             )
         device.status = data["status"]
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("DB error updating device %s: %s", device_id, exc)
+        return _json_error("Database error – could not update device.", 500)
     return jsonify(_device_to_dict(device))
 
 
@@ -180,7 +197,12 @@ def delete_device(device_id: str):
     if not device:
         return _json_error(f"Device '{device_id}' not found.", 404)
     db.session.delete(device)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("DB error deleting device %s: %s", device_id, exc)
+        return _json_error("Database error – could not delete device.", 500)
     return "", 204
 
 
@@ -310,7 +332,12 @@ def create_defect():
     )
     db.session.add(defect)
     device.status = "Wartung"
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("DB error creating defect: %s", exc)
+        return _json_error("Database error – could not save defect.", 500)
 
     # FileMaker sync (non-blocking – errors are logged, not raised)
     from filemaker import fm_client
@@ -377,7 +404,12 @@ def resolve_defect(defect_id: int):
 
         fm_client.update_device_status(device.device_id, "Verfügbar")
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("DB error resolving defect %d: %s", defect_id, exc)
+        return _json_error("Database error – could not resolve defect.", 500)
     return jsonify(_defect_to_dict(defect))
 
 

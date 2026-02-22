@@ -205,11 +205,13 @@ class TestSendEventSummaryReport:
         msg = mail.send.call_args[0][0]
         assert "Behoben" in msg.body
 
-    def test_mail_exception_does_not_propagate(self, app):
+    def test_mail_exception_propagates_to_caller(self, app):
+        """Exceptions must propagate so the view can show a user-facing error."""
         mail = MagicMock()
         mail.send.side_effect = Exception("Server unreachable")
         with app.app_context():
-            # Must not raise
-            send_event_summary_report(
-                mail, "Event", "PRJ-001", [_make_defect()], "chef@test.com"
-            )
+            import pytest as _pytest
+            with _pytest.raises(Exception, match="Server unreachable"):
+                send_event_summary_report(
+                    mail, "Event", "PRJ-001", [_make_defect()], "chef@test.com"
+                )

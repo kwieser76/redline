@@ -51,8 +51,33 @@ class FileMakerClient:
             resp.raise_for_status()
             self._token = resp.json()["response"]["token"]
             return True
+        except requests.ConnectionError:
+            logger.error(
+                "FileMaker login failed: Server '%s' ist nicht erreichbar. "
+                "Bitte FILEMAKER_HOST prüfen.",
+                self.host,
+            )
+            return False
+        except requests.Timeout:
+            logger.error(
+                "FileMaker login failed: Server '%s' antwortet nicht (Timeout).",
+                self.host,
+            )
+            return False
+        except requests.HTTPError as exc:
+            logger.error(
+                "FileMaker login failed: HTTP %s – Zugangsdaten (FILEMAKER_USERNAME / "
+                "FILEMAKER_PASSWORD) prüfen.",
+                exc.response.status_code if exc.response is not None else "unknown",
+            )
+            return False
+        except (KeyError, ValueError) as exc:
+            logger.error(
+                "FileMaker login failed: Unerwartetes Antwortformat – %s", exc
+            )
+            return False
         except Exception as exc:
-            logger.error("FileMaker login failed: %s", exc)
+            logger.error("FileMaker login failed (unexpected): %s", exc)
             return False
 
     def _logout(self) -> None:
@@ -95,12 +120,12 @@ class FileMakerClient:
                 timeout=10,
             )
             find_resp.raise_for_status()
-            records = find_resp.json()["response"]["data"]
-            if not records:
+            data = find_resp.json().get("response", {}).get("data", [])
+            if not data:
                 logger.warning("Device %s not found in FileMaker.", device_id)
                 return False
 
-            record_id = records[0]["recordId"]
+            record_id = data[0]["recordId"]
 
             # Patch the status
             patch_resp = requests.patch(
@@ -112,8 +137,26 @@ class FileMakerClient:
             patch_resp.raise_for_status()
             logger.info("FileMaker: device %s → %s", device_id, status)
             return True
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            logger.error(
+                "FileMaker update_device_status: Server nicht erreichbar – %s", exc
+            )
+            return False
+        except requests.HTTPError as exc:
+            logger.error(
+                "FileMaker update_device_status: HTTP-Fehler %s – %s",
+                exc.response.status_code if exc.response is not None else "?",
+                exc,
+            )
+            return False
+        except (KeyError, IndexError, ValueError) as exc:
+            logger.error(
+                "FileMaker update_device_status: Unerwartetes Antwortformat – %s",
+                exc,
+            )
+            return False
         except Exception as exc:
-            logger.error("FileMaker update_device_status error: %s", exc)
+            logger.error("FileMaker update_device_status (unexpected): %s", exc)
             return False
         finally:
             self._logout()
@@ -134,8 +177,20 @@ class FileMakerClient:
             resp.raise_for_status()
             logger.info("FileMaker defect record created: %s", resp.json())
             return True
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            logger.error(
+                "FileMaker create_defect_record: Server nicht erreichbar – %s", exc
+            )
+            return False
+        except requests.HTTPError as exc:
+            logger.error(
+                "FileMaker create_defect_record: HTTP-Fehler %s – %s",
+                exc.response.status_code if exc.response is not None else "?",
+                exc,
+            )
+            return False
         except Exception as exc:
-            logger.error("FileMaker create_defect_record error: %s", exc)
+            logger.error("FileMaker create_defect_record (unexpected): %s", exc)
             return False
         finally:
             self._logout()
