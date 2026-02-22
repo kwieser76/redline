@@ -739,3 +739,115 @@ class TestEmailValidation:
         assert resp.status_code == 200
         body = resp.data.decode("utf-8")
         assert "ltige E-Mail" not in body
+
+
+class TestAvailabilityReport:
+    """Tests for /admin/availability – Geräteverfügbarkeits-Report."""
+
+    # ------------------------------------------------------------------ #
+    #  Access control                                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_page_renders_for_admin(self, admin_client):
+        resp = admin_client.get("/admin/availability")
+        assert resp.status_code == 200
+        assert "Disponenten" in resp.data.decode("utf-8")
+
+    def test_redirects_unauthenticated(self, client):
+        resp = client.get("/admin/availability", follow_redirects=False)
+        assert resp.status_code == 302
+
+    def test_forbidden_for_team_user(self, team_client):
+        resp = team_client.get("/admin/availability")
+        assert resp.status_code == 403
+
+    # ------------------------------------------------------------------ #
+    #  No data                                                             #
+    # ------------------------------------------------------------------ #
+
+    def test_empty_result_shows_message(self, admin_client):
+        resp = admin_client.get("/admin/availability")
+        assert resp.status_code == 200
+        assert "Keine nicht" in resp.data.decode("utf-8")
+
+    # ------------------------------------------------------------------ #
+    #  With data                                                           #
+    # ------------------------------------------------------------------ #
+
+    def test_shows_defect_in_date_range(self, admin_client, defect):
+        """Defect created today should appear in today's report."""
+        resp = admin_client.get("/admin/availability")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "CAM-001" in body
+        assert "1 Eintr" in body  # "1 Einträge"
+
+    def test_date_range_filter_excludes_future(self, admin_client, defect):
+        """A date range in the far past should not include today's defect."""
+        resp = admin_client.get("/admin/availability?from=2020-01-01&to=2020-01-31")
+        assert resp.status_code == 200
+        assert "Keine nicht" in resp.data.decode("utf-8")
+
+    def test_category_filter(self, admin_client, defect):
+        """Filtering by category should only show matching defects."""
+        resp = admin_client.get(
+            "/admin/availability?category=Mechanischer+Schaden"
+        )
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "CAM-001" in body
+
+    def test_category_filter_no_match(self, admin_client, defect):
+        """A non-matching category filter should return empty."""
+        resp = admin_client.get("/admin/availability?category=Softwarefehler")
+        assert resp.status_code == 200
+        assert "Keine nicht" in resp.data.decode("utf-8")
+
+    def test_invalid_date_uses_today(self, admin_client, defect):
+        """Invalid date strings should fallback to today."""
+        resp = admin_client.get("/admin/availability?from=xxx&to=yyy")
+        assert resp.status_code == 200
+        # Should still show today's defect since defaults to today
+        assert "CAM-001" in resp.data.decode("utf-8")
+
+    def test_to_before_from_shows_flash(self, admin_client):
+        resp = admin_client.get(
+            "/admin/availability?from=2025-06-30&to=2025-06-01",
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert "Bis-Datum" in resp.data.decode("utf-8")
+
+    # ------------------------------------------------------------------ #
+    #  CSV export                                                          #
+    # ------------------------------------------------------------------ #
+
+    def test_csv_export_returns_csv(self, admin_client, defect):
+        resp = admin_client.get("/admin/availability/export")
+        assert resp.status_code == 200
+        assert "text/csv" in resp.content_type
+        body = resp.data.decode("utf-8-sig")
+        assert "Geräte-ID" in body  # header row
+        assert "CAM-001" in body
+
+    def test_csv_export_empty(self, admin_client):
+        resp = admin_client.get(
+            "/admin/availability/export?from=2020-01-01&to=2020-01-31"
+        )
+        assert resp.status_code == 200
+        assert "text/csv" in resp.content_type
+        lines = resp.data.decode("utf-8-sig").strip().split("\n")
+        assert len(lines) == 1  # header only
+
+    def test_csv_export_forbidden_for_team(self, team_client):
+        resp = team_client.get("/admin/availability/export")
+        assert resp.status_code == 403
+
+    # ------------------------------------------------------------------ #
+    #  Dashboard link                                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_dashboard_has_availability_link(self, admin_client):
+        resp = admin_client.get("/admin/")
+        assert resp.status_code == 200
+        assert "verfügbarkeit" in resp.data.decode("utf-8").lower()

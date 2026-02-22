@@ -4,17 +4,19 @@ Admin blueprint – /admin/*
 All routes require is_admin=True (enforced by the admin_required decorator).
 """
 
+import csv
 import io
 import logging
 import re
 import smtplib
 import socket
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import wraps
 
 import qrcode
 from flask import (
     Blueprint,
+    Response,
     abort,
     current_app,
     flash,
@@ -480,6 +482,132 @@ def _move_category(cat_id: int, direction: str) -> None:
         cats[idx].sort_order,
     )
     _safe_commit()
+
+
+# --------------------------------------------------------------------------- #
+#  Device availability report (Disponenten)                                     #
+# --------------------------------------------------------------------------- #
+
+
+def _parse_date(value: str | None, default: date) -> date:
+    """Parse an ISO date string, returning *default* on failure."""
+    if not value:
+        return default
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return default
+
+
+def _availability_query(from_date: date, to_date: date, category: str):
+    """Return defects that overlap [from_date, to_date].
+
+    A defect makes a device unavailable from created_at until resolved_at
+    (or until now if still open).
+    """
+    from_dt = datetime(from_date.year, from_date.month, from_date.day, tzinfo=timezone.utc)
+    to_dt = datetime(to_date.year, to_date.month, to_date.day, 23, 59, 59, tzinfo=timezone.utc)
+
+    query = (
+        Defect.query
+        .join(Device, Defect.device_id == Device.id)
+        .filter(Defect.created_at <= to_dt)
+        .filter(
+            db.or_(
+                Defect.resolved_at >= from_dt,
+                Defect.resolved_at.is_(None),
+            )
+        )
+    )
+    if category:
+        query = query.filter(Defect.category == category)
+
+    return query.order_by(Defect.created_at.desc()).all()
+
+
+@admin_bp.route("/availability")
+@admin_required
+def availability():
+    """Disponenten-Report: welche Geräte sind in einem Zeitraum nicht verfügbar?"""
+    today = date.today()
+    from_date = _parse_date(request.args.get("from"), today)
+    to_date = _parse_date(request.args.get("to"), today)
+
+    if to_date < from_date:
+        flash("Das Bis-Datum darf nicht vor dem Von-Datum liegen.", "danger")
+        to_date = from_date
+
+    category = request.args.get("category", "").strip()
+    defects = _availability_query(from_date, to_date, category)
+
+    categories = [
+        c.name
+        for c in DefectCategory.query.order_by(
+            DefectCategory.sort_order, DefectCategory.name
+        ).all()
+    ]
+
+    return render_template(
+        "admin/availability.html",
+        defects=defects,
+        from_date=from_date,
+        to_date=to_date,
+        category=category,
+        categories=categories,
+    )
+
+
+@admin_bp.route("/availability/export")
+@admin_required
+def availability_export():
+    """CSV-Export der Geräteverfügbarkeits-Übersicht."""
+    today = date.today()
+    from_date = _parse_date(request.args.get("from"), today)
+    to_date = _parse_date(request.args.get("to"), today)
+    if to_date < from_date:
+        to_date = from_date
+    category = request.args.get("category", "").strip()
+
+    defects = _availability_query(from_date, to_date, category)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow([
+        "Geräte-ID",
+        "Gerätename",
+        "Kategorie",
+        "Beschreibung",
+        "Status",
+        "Nicht verfügbar seit",
+        "Verfügbar ab",
+        "Event",
+        "Projektnummer",
+        "Gemeldet von",
+    ])
+    for d in defects:
+        writer.writerow([
+            d.device.device_id,
+            d.device.name,
+            d.category,
+            d.description,
+            "Defekt (offen)" if d.status == "Offen" else "Behoben",
+            d.created_at.strftime("%d.%m.%Y %H:%M"),
+            d.resolved_at.strftime("%d.%m.%Y %H:%M") if d.resolved_at else "–",
+            d.event_name,
+            d.project_number,
+            d.reporter,
+        ])
+
+    filename = f"verfuegbarkeit_{from_date.isoformat()}_{to_date.isoformat()}.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # UTF-8 BOM so Excel recognises the encoding
+            "Content-Type": "text/csv; charset=utf-8-sig",
+        },
+    )
 
 
 # --------------------------------------------------------------------------- #
