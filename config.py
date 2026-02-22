@@ -133,12 +133,14 @@ class DevelopmentConfig(Config):
 
     DEBUG: bool = True
     SQLALCHEMY_ECHO: bool = False  # set True to log all SQL
+    SHOW_DEBUG_INFO: bool = True  # show system-info card in help page
 
 
 class ProductionConfig(Config):
     """Production – strict validation, debug off."""
 
     DEBUG: bool = False
+    SHOW_DEBUG_INFO: bool = False  # never expose system info in production
 
     @classmethod
     def validate(cls) -> None:
@@ -181,6 +183,7 @@ class TestConfig(Config):
     APP_BASE_URL: str = "http://testserver"
     QR_CODE_DIR: str = "/tmp/test_redline_qrcodes"
     RATELIMIT_ENABLED: bool = False  # never throttle tests
+    SHOW_DEBUG_INFO: bool = False
 
 
 # Mapping used by create_app() when selecting config via FLASK_ENV
