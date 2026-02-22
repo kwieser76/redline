@@ -18,7 +18,7 @@
   <!-- Top navigation bar -->
   <header class="navbar">
     <div class="navbar-brand">
-      <a href="{% if current_user.is_authenticated and current_user.is_admin %}{{ url_for('admin.dashboard') }}{% elif current_user.is_authenticated and current_user.is_disponent %}{{ url_for('disponent.dashboard') }}{% else %}/{% endif %}" class="navbar-brand-link">
+      <a href="{% if current_user.is_authenticated and current_user.is_admin %}{{ url_for('admin.dashboard') }}{% elif current_user.is_authenticated and current_user.is_disponent %}{{ url_for('disponent.dashboard') }}{% elif current_user.is_authenticated and current_user.is_werkstatt %}{{ url_for('werkstatt.dashboard') }}{% else %}/{% endif %}" class="navbar-brand-link">
         <div class="brand-accent"></div>
         <div class="brand-text-block">
           <span class="brand-wordmark">re<span class="brand-d">d</span>line</span>
@@ -34,10 +34,13 @@
       {% if current_user.is_admin %}
       <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.') and request.endpoint != 'admin.help_page' %}active{% endif %}">Admin</a>
       <a href="{{ url_for('api_docs') }}" class="nav-link {% if request.endpoint == 'api_docs' %}active{% endif %}">API</a>
+      <a href="{{ url_for('werkstatt.dashboard') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('werkstatt.') %}active{% endif %}">Werkstatt</a>
       {% elif current_user.is_disponent %}
       <a href="{{ url_for('disponent.dashboard') }}" class="nav-link {% if request.endpoint == 'disponent.dashboard' %}active{% endif %}">Dashboard</a>
       <a href="{{ url_for('disponent.availability') }}" class="nav-link {% if request.endpoint == 'disponent.availability' %}active{% endif %}">Verfügbarkeit</a>
       <a href="{{ url_for('disponent.devices') }}" class="nav-link {% if request.endpoint == 'disponent.devices' %}active{% endif %}">Geräte</a>
+      {% elif current_user.is_werkstatt %}
+      <a href="{{ url_for('werkstatt.dashboard') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('werkstatt.') %}active{% endif %}">Werkstatt</a>
       {% endif %}
       <a href="{{ url_for('admin.help_page') }}" class="nav-link {% if request.endpoint == 'admin.help_page' %}active{% endif %}">Hilfe</a>
       <span class="nav-user" title="Angemeldet als: {{ current_user.username }}">{{ current_user.username }}</span>

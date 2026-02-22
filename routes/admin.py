@@ -227,6 +227,11 @@ def users():
             password = request.form.get("password", "")
             is_admin = request.form.get("is_admin") == "on"
             is_disponent = request.form.get("is_disponent") == "on" and not is_admin
+            is_werkstatt = (
+                request.form.get("is_werkstatt") == "on"
+                and not is_admin
+                and not is_disponent
+            )
             if not username or not password:
                 flash("Benutzername und Passwort sind erforderlich.", "danger")
             elif len(password) < 8:
@@ -238,6 +243,7 @@ def users():
                     username=username,
                     is_admin=is_admin,
                     is_disponent=is_disponent,
+                    is_werkstatt=is_werkstatt,
                 )
                 user.set_password(password)
                 db.session.add(user)

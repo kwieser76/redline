@@ -52,8 +52,9 @@ def create_app(config_class=None) -> Flask:
     if not app.config.get("TESTING"):
         config_class.validate()
 
-    # Ensure QR code directory exists
+    # Ensure QR code and photo upload directories exist
     os.makedirs(app.config["QR_CODE_DIR"], exist_ok=True)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     # ---------------------------------------------------------------------- #
     #  Extensions                                                              #
@@ -125,12 +126,14 @@ def create_app(config_class=None) -> Flask:
     from routes.report import report_bp
     from routes.admin import admin_bp
     from routes.disponent import disponent_bp
+    from routes.werkstatt import werkstatt_bp
     from api import api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(report_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(disponent_bp)
+    app.register_blueprint(werkstatt_bp)
     app.register_blueprint(api_bp)
 
     # ---------------------------------------------------------------------- #
@@ -168,6 +171,8 @@ def create_app(config_class=None) -> Flask:
                 return redirect(url_for("admin.dashboard"))
             if current_user.is_disponent:
                 return redirect(url_for("disponent.dashboard"))
+            if current_user.is_werkstatt:
+                return redirect(url_for("werkstatt.dashboard"))
             return redirect(url_for("admin.all_defects"))
         return redirect(url_for("auth.login"))
 
@@ -249,6 +254,15 @@ def _seed_db() -> None:
         db.session.add(disp)
         logger.warning(
             "Created default disponent user (disponent / disp2025). "
+            "CHANGE THIS PASSWORD before going live!"
+        )
+
+    if not User.query.filter_by(username="werkstatt").first():
+        ws = User(username="werkstatt", is_werkstatt=True)
+        ws.set_password("werk2025")
+        db.session.add(ws)
+        logger.warning(
+            "Created default werkstatt user (werkstatt / werk2025). "
             "CHANGE THIS PASSWORD before going live!"
         )
 

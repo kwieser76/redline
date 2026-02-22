@@ -16,7 +16,7 @@
   <div class="card-title">Defekt melden</div>
   <div class="card-subtitle">Füllen Sie das Formular aus, um einen Defekt für dieses Gerät zu melden.</div>
 
-  <form method="POST" action="{{ url_for('report.defect_form', device_id=device.device_id) }}" novalidate>
+  <form method="POST" action="{{ url_for('report.defect_form', device_id=device.device_id) }}" enctype="multipart/form-data" novalidate>
 
     <!-- Category -->
     <div class="form-group">
@@ -70,6 +70,22 @@
           required
           maxlength="50"
         />
+      </div>
+    </div>
+
+    <!-- Optional photo -->
+    <div class="form-group">
+      <label for="photo">Foto (optional)</label>
+      <input
+        type="file"
+        id="photo"
+        name="photo"
+        accept="image/*"
+        capture="environment"
+        class="photo-input"
+      />
+      <div style="font-size:12px;color:var(--gray-600);margin-top:4px;">
+        Erlaubt: JPG, PNG, GIF, WEBP · max. 16 MB
       </div>
     </div>
 

@@ -30,6 +30,9 @@
         <span class="badge {% if defect.status == 'Offen' %}badge-open{% else %}badge-resolved{% endif %}" style="margin-left:8px;">
           {{ defect.status }}
         </span>
+        <span class="badge badge-ws-{{ defect.werkstatt_status | lower | replace(' ', '-') }}" style="margin-left:6px;">
+          {{ defect.werkstatt_status }}
+        </span>
       </div>
       <div style="font-size:13px;color:var(--gray-600);">
         {{ defect.created_at.strftime('%d.%m.%Y %H:%M') }}
@@ -50,6 +53,16 @@
       {% if defect.resolution_notes %} &mdash; {{ defect.resolution_notes }}{% endif %}
     </div>
     {% endif %}
+
+    <!-- Comments summary + link to werkstatt detail -->
+    <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      {% set comment_count = defect.comments | length %}
+      {% set photo_count = defect.comments | selectattr('photo_path') | list | length %}
+      <a href="{{ url_for('werkstatt.defekt_detail', defect_id=defect.id) }}" style="font-size:13px;color:var(--gray-600);text-decoration:none;">
+        💬 {{ comment_count }} Kommentar{% if comment_count != 1 %}e{% endif %}{% if photo_count %} · 📷 {{ photo_count }} Foto{% if photo_count != 1 %}s{% endif %}{% endif %}
+        &nbsp;→ Werkstatt-Ansicht
+      </a>
+    </div>
 
     {% if defect.status == 'Offen' %}
     <form method="POST" action="{{ url_for('admin.mark_repaired', defect_id=defect.id) }}" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
