@@ -5,67 +5,67 @@
 <div class="action-bar">
   <div class="section-title" style="margin-bottom:0">{{ title }}</div>
   <div class="spacer"></div>
-  <a href="{{ url_for('disponent.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
 </div>
 
-<!-- Filter pills -->
+<!-- Filter bar -->
 <div class="card" style="padding-top:14px;padding-bottom:14px;">
-  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-    <span style="font-size:13px;color:var(--gray-500);margin-right:4px;">Filter:</span>
-    {% set filters = [
-      ('alle',            'Alle Geräte'),
-      ('verfuegbar',      'Verfügbar'),
-      ('nicht-verfuegbar','Nicht verfügbar'),
-      ('reserviert',      'Reserviert'),
-    ] %}
-    {% for key, label in filters %}
-    <a href="{{ url_for('disponent.tile_detail', filter_key=key) }}"
-       class="btn btn-sm {% if filter_key == key %}btn-primary{% else %}btn-outline{% endif %}">
-      {{ label }}
-    </a>
-    {% endfor %}
-  </div>
+  <form method="GET" action="{{ url_for('admin.admin_kachel', filter_key=filter_key) }}"
+        style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+      <label for="f-search" style="font-size:13px;">Suche</label>
+      <input type="text" id="f-search" name="search" value="{{ search }}"
+             placeholder="Name oder ID…" style="height:36px;font-size:14px;" />
+    </div>
+    <div class="form-group" style="margin-bottom:0;min-width:160px;">
+      <label for="f-cat" style="font-size:13px;">Produktkategorie</label>
+      <select id="f-cat" name="cat" style="height:36px;font-size:14px;">
+        <option value="">– Alle –</option>
+        {% for cat in device_categories %}
+        <option value="{{ cat.id }}" {% if cat_filter == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button type="submit" class="btn btn-primary btn-sm">Filtern</button>
+      <a href="{{ url_for('admin.admin_kachel', filter_key=filter_key) }}" class="btn btn-secondary btn-sm">Zurücksetzen</a>
+    </div>
+  </form>
 </div>
 
-<!-- Category filter -->
-{% if device_categories %}
-<div class="card" style="padding-top:10px;padding-bottom:10px;">
-  <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-    <span style="font-size:13px;color:var(--gray-500);margin-right:4px;">Kategorie:</span>
-    <a href="{{ url_for('disponent.tile_detail', filter_key=filter_key) }}"
-       class="btn btn-sm btn-outline" style="font-size:12px;">Alle</a>
-    {% for dc in device_categories %}
-    <a href="{{ url_for('disponent.tile_detail', filter_key=filter_key) }}#cat-{{ dc.id }}"
-       class="cat-badge" style="background:{{ dc.color }};text-decoration:none;cursor:default;">
-      {{ dc.name }}
-    </a>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
+<!-- Device list -->
 <div class="card">
   <div class="card-subtitle" style="margin-bottom:12px;">
-    {{ devices | length }} Gerät{{ 'e' if devices | length != 1 else '' }}
+    {{ devices|length }} Gerät{{ 'e' if devices|length != 1 else '' }}
+    {% if search %} · Suche: <strong>{{ search }}</strong>{% endif %}
+    {% if cat_filter %}
+      {% for cat in device_categories %}{% if cat.id == cat_filter %} · Kategorie: <strong>{{ cat.name }}</strong>{% endif %}{% endfor %}
+    {% endif %}
   </div>
 
   {% if devices %}
   <div class="table-wrapper">
-    <table id="tile-table">
+    <table id="kachel-table">
       <thead>
         <tr>
           <th data-sort="text" style="cursor:pointer;">Gerät ↕</th>
           <th data-sort="text">Geräte-ID</th>
           <th data-sort="text" style="cursor:pointer;">Kategorie ↕</th>
-          <th>Beschreibung</th>
           <th data-sort="text" style="cursor:pointer;">Status ↕</th>
           <th>Offene Defekte</th>
+          <th>Aktionen</th>
         </tr>
       </thead>
       <tbody>
         {% for device in devices %}
+        {% set open_defects = device.defects | selectattr('status', 'equalto', 'Offen') | list %}
         <tr>
-          <td><strong>{{ device.name }}</strong></td>
+          <td>
+            <strong>{{ device.name }}</strong>
+            {% if device.description %}
+            <br/><span style="font-size:12px;color:var(--gray-600)">{{ device.description }}</span>
+            {% endif %}
+          </td>
           <td><code>{{ device.device_id }}</code></td>
           <td>
             {% if device.product_category %}
@@ -75,10 +75,6 @@
             {% else %}
               <span style="color:var(--gray-400);font-size:13px;">–</span>
             {% endif %}
-          </td>
-          <td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-              title="{{ device.description }}">
-            {{ device.description or '–' }}
           </td>
           <td>
             {% if device.status == 'Verfügbar' %}
@@ -92,11 +88,19 @@
             {% endif %}
           </td>
           <td>
-            {% if device.open_defect_count > 0 %}
-              <span class="badge badge-open">{{ device.open_defect_count }}</span>
+            {% if open_defects|length > 0 %}
+              <span class="badge badge-open">{{ open_defects|length }}</span>
             {% else %}
               <span style="color:var(--gray-400);">0</span>
             {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a href="{{ url_for('admin.qr_page', device_id=device.device_id) }}"
+                 class="btn btn-sm btn-outline" title="QR-Code anzeigen">QR</a>
+              <a href="{{ url_for('admin.device_history', device_id=device.device_id) }}"
+                 class="btn btn-sm btn-secondary">Historie</a>
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -105,7 +109,7 @@
   </div>
   {% else %}
   <p style="color:var(--gray-500);margin:4px 0;">
-    Keine Geräte in dieser Kategorie.
+    Keine Geräte in dieser Ansicht.
   </p>
   {% endif %}
 </div>
@@ -114,7 +118,7 @@
 {% block extra_js %}
 <script>
 (function(){
-  const table = document.getElementById('tile-table');
+  const table = document.getElementById('kachel-table');
   if (!table) return;
   const headers = table.querySelectorAll('th[data-sort]');
   let sortCol = -1, sortAsc = true;

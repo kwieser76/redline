@@ -13,7 +13,7 @@ import pytest
 
 from app import create_app
 from config import Config, TestConfig
-from models import Comment, db as _db, Defect, DefectCategory, Device, EmailRecipient, User
+from models import Comment, db as _db, Defect, DefectCategory, Device, DeviceCategory, EmailRecipient, User
 
 
 # --------------------------------------------------------------------------- #
@@ -42,6 +42,10 @@ def clean_db(app):
         Comment.query.delete()
         Defect.query.delete()
         Device.query.delete()
+        seeded_cat_names = [name for name, _ in Config.DEVICE_CATEGORIES]
+        DeviceCategory.query.filter(
+            ~DeviceCategory.name.in_(seeded_cat_names)
+        ).delete(synchronize_session="fetch")
         EmailRecipient.query.filter(
             EmailRecipient.email != Config.WORKSHOP_EMAIL
         ).delete()

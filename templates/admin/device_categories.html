@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Produktkategorien{% endblock %}
+
+{% block content %}
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Produktkategorien</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
+</div>
+
+<!-- Add category form -->
+<div class="card">
+  <div class="card-title">Neue Kategorie anlegen</div>
+  <form method="POST" action="{{ url_for('admin.device_categories') }}" novalidate>
+    <input type="hidden" name="action" value="add" />
+    <div class="form-row">
+      <div class="form-group" style="flex:2;">
+        <label for="name">Name <span style="color:var(--red)">*</span></label>
+        <input type="text" id="name" name="name" placeholder="z.B. Ton, Licht, Bühne …" required maxlength="80" />
+      </div>
+      <div class="form-group" style="flex:1;min-width:120px;">
+        <label for="color">Farbe</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="color" id="color" name="color" value="#6b7280"
+                 style="width:48px;height:38px;padding:2px;border:1.5px solid var(--gray-300);border-radius:var(--radius);cursor:pointer;" />
+          <span style="font-size:13px;color:var(--gray-500);">Markierungsfarbe</span>
+        </div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Kategorie anlegen</button>
+  </form>
+</div>
+
+<!-- Category list -->
+<div class="card">
+  <div class="card-title">Alle Kategorien ({{ categories|length }})</div>
+  {% if categories %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th>Name</th>
+          <th>Farbe</th>
+          <th>Geräte</th>
+          <th>Bearbeiten</th>
+          <th>Löschen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in categories %}
+        <tr>
+          <td style="color:var(--gray-400);font-size:13px;">{{ cat.sort_order }}</td>
+          <td>
+            <span class="cat-badge" style="background:{{ cat.color }};">{{ cat.name }}</span>
+          </td>
+          <td>
+            <span class="cat-dot" style="background:{{ cat.color }};width:20px;height:20px;"></span>
+            <code style="font-size:12px;">{{ cat.color }}</code>
+          </td>
+          <td>
+            <span style="font-size:13px;color:var(--gray-600);">{{ cat.devices|length }}</span>
+          </td>
+          <td>
+            <!-- Inline edit form -->
+            <form method="POST" action="{{ url_for('admin.device_categories') }}"
+                  style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <input type="hidden" name="action" value="edit" />
+              <input type="hidden" name="cat_id" value="{{ cat.id }}" />
+              <input type="text" name="name" value="{{ cat.name }}" required maxlength="80"
+                     style="height:30px;font-size:13px;padding:0 8px;width:110px;
+                            border:1.5px solid var(--gray-300);border-radius:var(--radius);" />
+              <input type="color" name="color" value="{{ cat.color }}"
+                     style="width:36px;height:30px;padding:2px;border:1.5px solid var(--gray-300);
+                            border-radius:var(--radius);cursor:pointer;" />
+              <button type="submit" class="btn btn-sm btn-outline" title="Speichern">Speichern</button>
+            </form>
+          </td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.device_categories') }}" style="display:inline">
+              <input type="hidden" name="action" value="delete" />
+              <input type="hidden" name="cat_id" value="{{ cat.id }}" />
+              <button type="submit" class="btn btn-sm btn-danger"
+                data-confirm="Kategorie '{{ cat.name }}' löschen? Zugewiesene Geräte verlieren die Kategorie.">
+                Löschen
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:var(--gray-600);text-align:center;padding:24px 0;">
+    Noch keine Kategorien angelegt.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

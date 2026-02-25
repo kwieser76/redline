@@ -5,7 +5,7 @@
 <div class="action-bar">
   <div class="section-title" style="margin-bottom:0">Geräteverwaltung</div>
   <div class="spacer"></div>
-  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Zurück zum Dashboard</a>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
 </div>
 
 <!-- Add device form -->
@@ -23,27 +23,80 @@
         <input type="text" id="name" name="name" placeholder="z.B. Kamera Sony A7 IV" required maxlength="120" />
       </div>
     </div>
-    <div class="form-group">
-      <label for="description">Beschreibung</label>
-      <input type="text" id="description" name="description" placeholder="Optionale Beschreibung" maxlength="255" />
+    <div class="form-row">
+      <div class="form-group">
+        <label for="description">Beschreibung</label>
+        <input type="text" id="description" name="description" placeholder="Optionale Beschreibung" maxlength="255" />
+      </div>
+      <div class="form-group">
+        <label for="category_id">Produktkategorie</label>
+        <select id="category_id" name="category_id">
+          <option value="">– Keine –</option>
+          {% for cat in device_categories %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
     <button type="submit" class="btn btn-primary">Gerät anlegen</button>
+  </form>
+</div>
+
+<!-- Filter bar -->
+<div class="card" style="padding-top:14px;padding-bottom:14px;">
+  <form method="GET" action="{{ url_for('admin.devices') }}"
+        style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
+      <label for="f-search" style="font-size:13px;">Suche</label>
+      <input type="text" id="f-search" name="search" value="{{ search }}"
+             placeholder="Name oder ID…" style="height:36px;font-size:14px;" />
+    </div>
+    <div class="form-group" style="margin-bottom:0;min-width:140px;">
+      <label for="f-status" style="font-size:13px;">Status</label>
+      <select id="f-status" name="status" style="height:36px;font-size:14px;">
+        <option value="">– Alle –</option>
+        <option value="Verfügbar"  {% if status_filter == 'Verfügbar'  %}selected{% endif %}>Verfügbar</option>
+        <option value="Wartung"    {% if status_filter == 'Wartung'    %}selected{% endif %}>Wartung</option>
+        <option value="Reserviert" {% if status_filter == 'Reserviert' %}selected{% endif %}>Reserviert</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;min-width:160px;">
+      <label for="f-cat" style="font-size:13px;">Produktkategorie</label>
+      <select id="f-cat" name="cat" style="height:36px;font-size:14px;">
+        <option value="">– Alle –</option>
+        {% for cat in device_categories %}
+        <option value="{{ cat.id }}" {% if cat_filter == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button type="submit" class="btn btn-primary btn-sm">Filtern</button>
+      <a href="{{ url_for('admin.devices') }}" class="btn btn-secondary btn-sm">Zurücksetzen</a>
+    </div>
   </form>
 </div>
 
 <!-- Device list -->
 <div class="card">
   <div class="card-header">
-    <div class="card-title" style="margin-bottom:0">Alle Geräte ({{ devices|length }})</div>
+    <div class="card-title" style="margin-bottom:0">
+      Geräte
+      {% if status_filter or cat_filter or search %}
+        <span style="font-size:14px;font-weight:400;color:var(--gray-600);">(gefiltert: {{ devices|length }})</span>
+      {% else %}
+        <span style="font-size:14px;font-weight:400;color:var(--gray-600);">({{ devices|length }} gesamt)</span>
+      {% endif %}
+    </div>
   </div>
   {% if devices %}
   <div class="table-wrapper">
-    <table>
+    <table id="devices-table">
       <thead>
         <tr>
-          <th>Gerät</th>
-          <th>ID</th>
-          <th>Status</th>
+          <th data-sort="text" style="cursor:pointer;">Gerät ↕</th>
+          <th data-sort="text">Geräte-ID</th>
+          <th data-sort="text" style="cursor:pointer;">Kategorie ↕</th>
+          <th data-sort="text" style="cursor:pointer;">Status ↕</th>
           <th>Aktionen</th>
         </tr>
       </thead>
@@ -58,12 +111,33 @@
           </td>
           <td><code>{{ device.device_id }}</code></td>
           <td>
+            {% if device.product_category %}
+              <span class="cat-badge" style="background:{{ device.product_category.color }};">
+                {{ device.product_category.name }}
+              </span>
+            {% else %}
+              <span style="color:var(--gray-400);font-size:13px;">–</span>
+            {% endif %}
+          </td>
+          <td>
             <span class="badge {% if device.status == 'Verfügbar' %}badge-available{% else %}badge-maintenance{% endif %}">
               {{ device.status }}
             </span>
           </td>
           <td>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <!-- Kategorie zuweisen -->
+              <form method="POST" action="{{ url_for('admin.devices') }}" style="display:flex;gap:4px;align-items:center;">
+                <input type="hidden" name="action" value="set_category" />
+                <input type="hidden" name="dev_id" value="{{ device.id }}" />
+                <select name="category_id" style="height:30px;font-size:13px;padding:0 6px;border-radius:var(--radius);border:1.5px solid var(--gray-300);">
+                  <option value="">– Keine –</option>
+                  {% for cat in device_categories %}
+                  <option value="{{ cat.id }}" {% if device.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline" title="Kategorie speichern">✓</button>
+              </form>
               <a href="{{ url_for('admin.qr_page', device_id=device.device_id) }}" class="btn btn-sm btn-outline" title="QR-Code anzeigen">
                 QR
               </a>
@@ -86,7 +160,38 @@
     </table>
   </div>
   {% else %}
-  <p style="color:var(--gray-600);text-align:center;padding:24px 0;">Noch keine Geräte angelegt.</p>
+  <p style="color:var(--gray-600);text-align:center;padding:24px 0;">
+    {% if status_filter or cat_filter or search %}
+      Keine Geräte für diesen Filter gefunden.
+    {% else %}
+      Noch keine Geräte angelegt.
+    {% endif %}
+  </p>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const table = document.getElementById('devices-table');
+  if (!table) return;
+  const headers = table.querySelectorAll('th[data-sort]');
+  let sortCol = -1, sortAsc = true;
+  headers.forEach(function(th, idx){
+    th.addEventListener('click', function(){
+      if (sortCol === idx) { sortAsc = !sortAsc; } else { sortCol = idx; sortAsc = true; }
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort(function(a, b){
+        const va = a.children[idx].textContent.trim();
+        const vb = b.children[idx].textContent.trim();
+        const cmp = va.localeCompare(vb, 'de', {numeric: true});
+        return sortAsc ? cmp : -cmp;
+      });
+      rows.forEach(function(r){ tbody.appendChild(r); });
+    });
+  });
+})();
+</script>
 {% endblock %}

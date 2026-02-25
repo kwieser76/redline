@@ -1,40 +1,71 @@
 {% extends "base.html" %}
 {% block title %}Admin Dashboard{% endblock %}
 
+{% block extra_head %}
+<style>
+.stat-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .12s, box-shadow .12s;
+  cursor: pointer;
+}
+.stat-card-link:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.13);
+}
+.stat-hint {
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 6px;
+  letter-spacing: .03em;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="section-title">Dashboard</div>
 
-<!-- Stats -->
+<!-- Stats – clickable tiles -->
 <div class="stat-grid">
-  <div class="stat-card">
+  <a href="{{ url_for('admin.admin_kachel', filter_key='alle') }}"
+     class="stat-card stat-card-link" title="Alle Geräte anzeigen">
     <div class="stat-value stat-blue">{{ total_devices }}</div>
     <div class="stat-label">Geräte gesamt</div>
-  </div>
-  <div class="stat-card">
+    <div class="stat-hint">→ Liste anzeigen</div>
+  </a>
+  <a href="{{ url_for('admin.admin_kachel', filter_key='wartung') }}"
+     class="stat-card stat-card-link" title="Geräte in Wartung anzeigen">
     <div class="stat-value stat-red">{{ maintenance_devices }}</div>
     <div class="stat-label">In Wartung</div>
-  </div>
-  <div class="stat-card">
+    <div class="stat-hint">→ Liste anzeigen</div>
+  </a>
+  <a href="{{ url_for('admin.admin_kachel', filter_key='verfuegbar') }}"
+     class="stat-card stat-card-link" title="Verfügbare Geräte anzeigen">
     <div class="stat-value stat-green">{{ total_devices - maintenance_devices }}</div>
     <div class="stat-label">Verfügbar</div>
-  </div>
-  <div class="stat-card">
+    <div class="stat-hint">→ Liste anzeigen</div>
+  </a>
+  <a href="{{ url_for('admin.all_defects', status='Offen') }}"
+     class="stat-card stat-card-link" title="Alle offenen Defekte anzeigen">
     <div class="stat-value stat-orange">{{ open_defects }}</div>
     <div class="stat-label">Offene Defekte</div>
-  </div>
+    <div class="stat-hint">→ Liste anzeigen</div>
+  </a>
 </div>
 
 <!-- Quick links -->
 <div class="card">
   <div class="card-title">Schnellzugriff</div>
   <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">
-    <a href="{{ url_for('admin.devices') }}"      class="btn btn-primary">Geräteverwaltung</a>
-    <a href="{{ url_for('admin.all_defects') }}"  class="btn btn-outline">Alle Defekte</a>
-    <a href="{{ url_for('admin.users') }}"         class="btn btn-outline">Benutzerverwaltung</a>
-    <a href="{{ url_for('admin.event_report') }}"  class="btn btn-outline">Ereignisberichte</a>
-    <a href="{{ url_for('admin.availability') }}"  class="btn btn-outline">Geräteverfügbarkeit</a>
-    <a href="{{ url_for('admin.categories') }}"    class="btn btn-outline">Defektkategorien</a>
-    <a href="{{ url_for('admin.recipients') }}"    class="btn btn-outline">E-Mail-Empfänger</a>
+    <a href="{{ url_for('admin.devices') }}"           class="btn btn-primary">Geräteverwaltung</a>
+    <a href="{{ url_for('admin.all_defects') }}"       class="btn btn-outline">Alle Defekte</a>
+    <a href="{{ url_for('admin.users') }}"             class="btn btn-outline">Benutzerverwaltung</a>
+    <a href="{{ url_for('admin.event_report') }}"      class="btn btn-outline">Ereignisberichte</a>
+    <a href="{{ url_for('admin.availability') }}"      class="btn btn-outline">Geräteverfügbarkeit</a>
+    <a href="{{ url_for('admin.device_categories') }}" class="btn btn-outline">Produktkategorien</a>
+    <a href="{{ url_for('admin.categories') }}"        class="btn btn-outline">Defektkategorien</a>
+    <a href="{{ url_for('admin.recipients') }}"        class="btn btn-outline">E-Mail-Empfänger</a>
   </div>
 </div>
 
@@ -49,6 +80,7 @@
         <tr>
           <th>Gerät</th>
           <th>ID</th>
+          <th>Kategorie</th>
           <th>Offene Defekte</th>
           <th>Aktionen</th>
         </tr>
@@ -58,6 +90,16 @@
         <tr>
           <td><strong>{{ device.name }}</strong></td>
           <td><code>{{ device.device_id }}</code></td>
+          <td>
+            {% if device.product_category %}
+            <span class="cat-badge" style="background:{{ device.product_category.color }}20;color:{{ device.product_category.color }};border:1px solid {{ device.product_category.color }}40;">
+              <span class="cat-dot" style="background:{{ device.product_category.color }};"></span>
+              {{ device.product_category.name }}
+            </span>
+            {% else %}
+            <span style="color:var(--gray-400);font-size:13px;">–</span>
+            {% endif %}
+          </td>
           <td>
             <span class="badge badge-open">{{ device.open_defect_count }}</span>
           </td>

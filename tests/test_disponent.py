@@ -387,7 +387,8 @@ class TestDisponentCsvExport:
         first_line = resp.data.decode("utf-8").splitlines()[0]
         assert "Geräte-ID" in first_line
         assert "Gerätename" in first_line
-        assert "Kategorie" in first_line
+        assert "Produktkategorie" in first_line
+        assert "Defektkategorie" in first_line
 
     def test_csv_contains_defect_data(self, disponent_client, open_defect):
         resp = disponent_client.get(

@@ -30,7 +30,7 @@ from flask_login import current_user, login_required
 from flask_mail import Mail
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from models import Defect, DefectCategory, Device, EmailRecipient, User, db
+from models import Defect, DefectCategory, Device, DeviceCategory, EmailRecipient, User, db
 from notifications import send_event_summary_report
 
 logger = logging.getLogger(__name__)
@@ -121,13 +121,17 @@ def devices():
             device_id = request.form.get("device_id", "").strip()
             name = request.form.get("name", "").strip()
             description = request.form.get("description", "").strip()
+            category_id = request.form.get("category_id", type=int) or None
             if not device_id or not name:
                 flash("Geräte-ID und Name sind erforderlich.", "danger")
             elif Device.query.filter_by(device_id=device_id).first():
                 flash(f"Geräte-ID '{device_id}' ist bereits vergeben.", "danger")
             else:
                 device = Device(
-                    device_id=device_id, name=name, description=description
+                    device_id=device_id,
+                    name=name,
+                    description=description,
+                    category_id=category_id,
                 )
                 db.session.add(device)
                 _safe_commit(f"Gerät '{name}' wurde angelegt.")
@@ -139,8 +143,39 @@ def devices():
                 db.session.delete(device)
                 _safe_commit("Gerät gelöscht.")
 
-    all_devices = Device.query.order_by(Device.name).all()
-    return render_template("admin/devices.html", devices=all_devices)
+        elif action == "set_category":
+            dev_id = request.form.get("dev_id", type=int)
+            category_id = request.form.get("category_id", type=int) or None
+            device = db.session.get(Device, dev_id)
+            if device:
+                device.category_id = category_id
+                _safe_commit("Kategorie aktualisiert.")
+
+    # Filters (GET params)
+    status_filter = request.args.get("status", "").strip()
+    cat_filter = request.args.get("cat", type=int)
+    search = request.args.get("search", "").strip()
+
+    query = Device.query
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    if cat_filter:
+        query = query.filter_by(category_id=cat_filter)
+    if search:
+        query = query.filter(
+            Device.name.ilike(f"%{search}%") | Device.device_id.ilike(f"%{search}%")
+        )
+
+    all_devices = query.order_by(Device.name).all()
+    all_categories = DeviceCategory.query.order_by(DeviceCategory.sort_order).all()
+    return render_template(
+        "admin/devices.html",
+        devices=all_devices,
+        device_categories=all_categories,
+        status_filter=status_filter,
+        cat_filter=cat_filter,
+        search=search,
+    )
 
 
 @admin_bp.route("/qr/<string:device_id>")
@@ -618,6 +653,111 @@ def availability_export():
             # UTF-8 BOM so Excel recognises the encoding
             "Content-Type": "text/csv; charset=utf-8-sig",
         },
+    )
+
+
+# --------------------------------------------------------------------------- #
+#  Device categories (Produktkategorien)                                        #
+# --------------------------------------------------------------------------- #
+
+
+@admin_bp.route("/device-categories", methods=["GET", "POST"])
+@admin_required
+def device_categories():
+    """CRUD for device product categories (Ton, Licht, Bühne …)."""
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "add":
+            name = request.form.get("name", "").strip()
+            color = request.form.get("color", "#6b7280").strip()
+            if not name:
+                flash("Kategorienname ist erforderlich.", "danger")
+            elif DeviceCategory.query.filter_by(name=name).first():
+                flash(f"Kategorie '{name}' existiert bereits.", "danger")
+            else:
+                max_order = db.session.query(
+                    db.func.max(DeviceCategory.sort_order)
+                ).scalar() or 0
+                cat = DeviceCategory(name=name, color=color, sort_order=max_order + 1)
+                db.session.add(cat)
+                _safe_commit(f"Kategorie '{name}' wurde angelegt.")
+
+        elif action == "delete":
+            cat_id = request.form.get("cat_id", type=int)
+            cat = db.session.get(DeviceCategory, cat_id)
+            if cat:
+                # Unlink devices before deleting
+                Device.query.filter_by(category_id=cat_id).update(
+                    {"category_id": None}
+                )
+                db.session.delete(cat)
+                _safe_commit(f"Kategorie '{cat.name}' wurde gelöscht.")
+
+        elif action == "edit":
+            cat_id = request.form.get("cat_id", type=int)
+            cat = db.session.get(DeviceCategory, cat_id)
+            if cat:
+                new_name = request.form.get("name", "").strip()
+                new_color = request.form.get("color", cat.color).strip()
+                if not new_name:
+                    flash("Kategorienname darf nicht leer sein.", "danger")
+                elif new_name != cat.name and DeviceCategory.query.filter_by(name=new_name).first():
+                    flash(f"Kategorie '{new_name}' existiert bereits.", "danger")
+                else:
+                    cat.name = new_name
+                    cat.color = new_color
+                    _safe_commit(f"Kategorie aktualisiert.")
+
+    cats = DeviceCategory.query.order_by(DeviceCategory.sort_order).all()
+    return render_template("admin/device_categories.html", categories=cats)
+
+
+# --------------------------------------------------------------------------- #
+#  Admin dashboard tile detail (klickbare Kacheln)                              #
+# --------------------------------------------------------------------------- #
+
+_ADMIN_TILE_MAP: dict[str, tuple[str, str | None]] = {
+    "alle":       ("Alle Geräte",         None),
+    "wartung":    ("Geräte in Wartung",   "Wartung"),
+    "verfuegbar": ("Verfügbare Geräte",   "Verfügbar"),
+    "reserviert": ("Reservierte Geräte",  "Reserviert"),
+}
+
+
+@admin_bp.route("/kachel/<filter_key>")
+@admin_required
+def admin_kachel(filter_key: str):
+    """Filtered device list behind a dashboard stat tile."""
+    if filter_key not in _ADMIN_TILE_MAP:
+        abort(404)
+
+    title, status_filter = _ADMIN_TILE_MAP[filter_key]
+
+    search = request.args.get("search", "").strip()
+    cat_filter = request.args.get("cat", type=int)
+
+    query = Device.query
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    if search:
+        query = query.filter(
+            Device.name.ilike(f"%{search}%") | Device.device_id.ilike(f"%{search}%")
+        )
+    if cat_filter:
+        query = query.filter_by(category_id=cat_filter)
+
+    device_list = query.order_by(Device.name).all()
+    device_categories = DeviceCategory.query.order_by(DeviceCategory.sort_order).all()
+
+    return render_template(
+        "admin/kachel_detail.html",
+        devices=device_list,
+        title=title,
+        filter_key=filter_key,
+        search=search,
+        cat_filter=cat_filter,
+        device_categories=device_categories,
     )
 
 

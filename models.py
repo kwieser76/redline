@@ -53,6 +53,25 @@ class User(UserMixin, db.Model):
         return f"<User {self.username} role={self.role}>"
 
 
+class DeviceCategory(db.Model):
+    """Product category for devices (e.g. Ton, Licht, Bühne, Video)."""
+
+    __tablename__ = "device_categories"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    color = db.Column(db.String(7), default="#6b7280", nullable=False)  # CSS hex color
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    devices = db.relationship("Device", back_populates="product_category", lazy=True)
+
+    def __repr__(self) -> str:
+        return f"<DeviceCategory {self.name}>"
+
+
 class Device(db.Model):
     __tablename__ = "devices"
 
@@ -66,10 +85,17 @@ class Device(db.Model):
         nullable=False,
         index=True,
     )  # "Verfügbar" | "Wartung" | "Reserviert"
+    category_id = db.Column(
+        db.Integer, db.ForeignKey("device_categories.id"), nullable=True, index=True
+    )
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
+    # Relationships
+    product_category = db.relationship(
+        "DeviceCategory", back_populates="devices", lazy=True
+    )
     # Cascade: deleting a device also deletes all its defect records.
     defects = db.relationship(
         "Defect",

@@ -17,20 +17,29 @@
 
   <form method="GET" action="{{ url_for('disponent.availability') }}"
         style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-top:12px;">
-    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
       <label for="from">Von</label>
       <input type="date" id="from" name="from" value="{{ from_date.isoformat() }}" />
     </div>
-    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
       <label for="to">Bis</label>
       <input type="date" id="to" name="to" value="{{ to_date.isoformat() }}" />
     </div>
-    <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px;">
-      <label for="category">Kategorie</label>
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+      <label for="category">Defektkategorie</label>
       <select id="category" name="category">
         <option value="">– Alle –</option>
         {% for cat in categories %}
         <option value="{{ cat }}" {% if cat == category %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+      <label for="device_cat">Produktkategorie</label>
+      <select id="device_cat" name="device_cat">
+        <option value="">– Alle –</option>
+        {% for dc in device_categories %}
+        <option value="{{ dc.id }}" {% if device_cat_id == dc.id %}selected{% endif %}>{{ dc.name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -58,7 +67,10 @@
   {% if defects %}
   <div class="card-subtitle" style="margin-bottom:10px;">
     Zeitraum: {{ from_date.strftime('%d.%m.%Y') }} – {{ to_date.strftime('%d.%m.%Y') }}
-    {% if category %} · Kategorie: <strong>{{ category }}</strong>{% endif %}
+    {% if category %} · Defektkategorie: <strong>{{ category }}</strong>{% endif %}
+    {% if device_cat_id %}
+      {% for dc in device_categories %}{% if dc.id == device_cat_id %} · Produktkategorie: <strong>{{ dc.name }}</strong>{% endif %}{% endfor %}
+    {% endif %}
   </div>
 
   <div class="table-wrapper">
@@ -67,7 +79,8 @@
         <tr>
           <th data-sort="text" style="cursor:pointer;">Gerät ↕</th>
           <th data-sort="text">Geräte-ID</th>
-          <th data-sort="text" style="cursor:pointer;">Kategorie ↕</th>
+          <th data-sort="text" style="cursor:pointer;">Produktkategorie ↕</th>
+          <th data-sort="text" style="cursor:pointer;">Defektkategorie ↕</th>
           <th>Grund</th>
           <th data-sort="date" style="cursor:pointer;">Seit ↕</th>
           <th data-sort="date" style="cursor:pointer;">Bis ↕</th>
@@ -80,6 +93,15 @@
         <tr>
           <td><strong>{{ d.device.name }}</strong></td>
           <td><code>{{ d.device.device_id }}</code></td>
+          <td>
+            {% if d.device.product_category %}
+              <span class="cat-badge" style="background:{{ d.device.product_category.color }};">
+                {{ d.device.product_category.name }}
+              </span>
+            {% else %}
+              <span style="color:var(--gray-400);font-size:13px;">–</span>
+            {% endif %}
+          </td>
           <td>{{ d.category }}</td>
           <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
               title="{{ d.description }}">{{ d.description }}</td>
@@ -112,7 +134,10 @@
   {% else %}
   <p style="color:var(--gray-500);margin:16px 0 0;">
     Keine nicht verfügbaren Geräte im gewählten Zeitraum
-    {%- if category %} (Kategorie: {{ category }}){% endif %}.
+    {%- if category %} (Defektkategorie: {{ category }}){% endif %}
+    {%- if device_cat_id %}
+      {% for dc in device_categories %}{% if dc.id == device_cat_id %} (Produktkategorie: {{ dc.name }}){% endif %}{% endfor %}
+    {%- endif %}.
   </p>
   {% endif %}
 </div>

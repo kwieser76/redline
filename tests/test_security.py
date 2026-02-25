@@ -103,8 +103,10 @@ class TestXSSContainment:
         )
         resp = admin_client.get("/admin/devices")
         body = resp.data.decode("utf-8")
-        # Raw <script> tag must not appear unescaped; escaped form &lt;script&gt; is safe
-        assert "<script>" not in body, "Raw <script> tag found in response – XSS risk"
+        # Raw XSS payload must not appear unescaped; escaped form &lt;script&gt; is safe
+        xss_payload = self.XSS_DEVICE_NAME  # '<script>alert("xss")</script>'
+        assert xss_payload not in body, "Raw XSS payload found unescaped in response"
+        assert "&lt;script&gt;" in body, "Escaped form of XSS payload not found"
 
     def test_device_description_xss_escaped_in_admin_list(self, app, admin_client):
         """img onerror payload must not appear as a raw HTML tag."""
