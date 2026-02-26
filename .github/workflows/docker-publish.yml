@@ -22,6 +22,7 @@ on:
     branches:
       - main
       - master
+      - Redline-main
   workflow_dispatch:   # allows manual trigger from GitHub → Actions tab
 
 env:
@@ -62,10 +63,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # latest on default branch
-            type=raw,value=latest,enable={{is_default_branch}}
-            # branch name tag (e.g. "main", "master")
-            type=ref,event=branch
+            # always push latest (used by Hostinger to pull the current image)
+            type=raw,value=latest
             # short git SHA tag for traceability (e.g. "sha-abc1234")
             type=sha,prefix=sha-
 
