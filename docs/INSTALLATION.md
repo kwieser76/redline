@@ -1141,6 +1141,48 @@ Danach die App normal neu starten – der Seed legt den Default-Disponent-Benutz
 
 ---
 
+### Manuelle Migration: v0.1b – alle neuen Spalten auf einmal (empfohlen)
+
+Ab **v0.1b** wurden folgende Spalten hinzugefügt:
+
+| Tabelle | Spalte | Typ | Standard |
+|---------|--------|-----|---------|
+| `users` | `is_api_user` | BOOLEAN | `0` (False) |
+| `users` | `is_werkstatt` | BOOLEAN | `0` (False) |
+| `devices` | `category_id` | INTEGER (FK) | `NULL` |
+| *(neu)* | `device_categories` | Tabelle | – |
+
+Statt die Spalten einzeln hinzuzufügen, gibt es das Migrations-Script `migrate_db.py` im Projektstamm:
+
+**Windows (PowerShell / Eingabeaufforderung im Projektordner):**
+```powershell
+venv\Scripts\activate
+python migrate_db.py
+```
+
+**Mac / Linux (Terminal im Projektordner):**
+```bash
+source venv/bin/activate
+python migrate_db.py
+```
+
+**Docker Compose:**
+```bash
+docker compose exec redline python migrate_db.py
+```
+
+Das Script prüft jede Spalte einzeln und überspringt bereits vorhandene – es ist sicher mehrfach ausführbar.
+
+**PostgreSQL (manuell):**
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_api_user  BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_werkstatt BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS device_categories (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES device_categories(id);
+```
+
+---
+
 ## 8. Backup & Restore
 
 ### SQLite (default)
