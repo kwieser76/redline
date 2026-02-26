@@ -21,7 +21,7 @@ services:
   redline:
     # Image is built automatically by GitHub Actions and pushed to GHCR.
     # For local builds use docker-compose.build.yml overlay instead.
-    image: ghcr.io/kwieser76/redline-:latest
+    image: ghcr.io/kwieser76/redline:latest
     container_name: redline_app
     restart: unless-stopped
 

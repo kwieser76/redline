@@ -502,7 +502,7 @@ Damit Hostinger das Image ohne Passwort ziehen kann, muss es öffentlich sein:
 4. Scrolle ganz nach unten zu **„Danger Zone"** → **„Change visibility"**
 5. Wähle **„Public"** → bestätige mit dem Repository-Namen → **„I understand, change package visibility"**
 
-> Das Image ist jetzt unter `ghcr.io/kwieser76/redline-:latest` öffentlich erreichbar.
+> Das Image ist jetzt unter `ghcr.io/kwieser76/redline:latest` öffentlich erreichbar.
 
 ---
 
