@@ -5,7 +5,7 @@
 # Can also be run manually via GitHub → Actions → "Build and push Docker image"
 #
 # The built image is published to:
-#   ghcr.io/kwieser76/redline-:latest
+#   ghcr.io/kwieser76/redline:latest
 #
 # Hostinger HPanel then pulls this image without needing to build locally.
 #
@@ -27,8 +27,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # github.repository is "kwieser76/Redline-" → GHCR lowercases it automatically
-  IMAGE_NAME: ${{ github.repository }}
+  # github.repository would give "kwieser76/Redline-" which lowercases to
+  # "kwieser76/redline-" – Docker rejects names ending with a hyphen.
+  # Use an explicit name without the trailing hyphen.
+  IMAGE_NAME: kwieser76/redline
 
 jobs:
   build-and-push:
