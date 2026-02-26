@@ -33,7 +33,7 @@ services:
 
     environment:
       DATABASE_URL: "sqlite:////app/data/redline.db"
-      FLASK_ENV: "production"
+      FLASK_ENV: "development"
 
     volumes:
       - redline_data:/app/data
