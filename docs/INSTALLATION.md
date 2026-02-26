@@ -5,6 +5,7 @@
 ## Inhaltsverzeichnis
 
 0. [Lokales Testen – Schritt-für-Schritt (Windows & Mac, kein Entwicklerwissen nötig)](#0-lokales-testen--schritt-für-schritt-windows--mac)
+→ [Hostinger VPS + Cloudflare – Live-Deployment (für Nicht-Techniker)](#hostinger-vps--cloudflare--live-deployment-für-nicht-techniker)
 1. [Voraussetzungen (Entwickler)](#1-voraussetzungen-entwickler)
 2. [Lokale Entwicklung (Python venv)](#2-lokale-entwicklung-python-venv)
 3. [Umgebungskonfiguration (.env)](#3-umgebungskonfiguration-env)
@@ -418,6 +419,344 @@ python app.py
 | `fatal: not a git repository` | Falscher Ordner | Zuerst `cd C:\Users\...\Redline-` (Windows) bzw. `cd ~/Redline-` (Mac) ausführen |
 | `error: Your local changes ... would be overwritten` | Du hast Dateien lokal verändert | Zuerst `git stash` ausführen, dann nochmals `git pull origin Redline-main` |
 | `error: failed to push` | Keine Schreibrechte | Nur für Entwickler relevant; Update via `git pull` ist ausreichend |
+
+---
+
+---
+
+## Hostinger VPS + Cloudflare – Live-Deployment (für Nicht-Techniker)
+
+> **Für wen ist das?**
+> Du hast eine Domain bei Cloudflare und möchtest Redline auf einem Hostinger-Server im Internet betreiben,
+> sodass Techniker von überall QR-Codes scannen können – auch vom iPhone außerhalb des Büros.
+
+---
+
+### Was du brauchst (Vorbereitung)
+
+- Ein **Hostinger-Konto** mit einem VPS (Virtual Private Server) – empfohlen: **KVM 1** oder höher
+- Eine **Domain**, deren DNS-Einstellungen in **Cloudflare** verwaltet werden
+- Die Zugangsdaten für deinen Server: **IP-Adresse** und **Root-Passwort** (findest du im Hostinger-Dashboard)
+- Ca. **30–60 Minuten** Zeit
+
+### Wie das System danach aussieht
+
+```
+iPhone / Laptop / Browser
+         ↓ HTTPS (automatisch via Cloudflare)
+   Cloudflare DNS  →  Deine Domain (z.B. redline.deine-firma.de)
+         ↓
+   Hostinger VPS  →  Nginx (Webserver, Port 80/443)
+         ↓ intern (Port 8000)
+   Redline in Docker  →  Datenbank, QR-Codes, Fotos
+```
+
+---
+
+### Schritt 1 – Hostinger VPS bestellen und einrichten
+
+1. Logge dich bei **hpanel.hostinger.com** ein
+2. Klicke auf **VPS** → **VPS kaufen** (oder nutze einen bestehenden VPS)
+3. Wähle mindestens **KVM 1** (1 vCPU, 4 GB RAM) – für kleine Teams bis ~50 Geräte ausreichend
+4. Wähle als Betriebssystem: **Ubuntu 22.04 LTS**
+5. Wähle einen Serverstandort (für Europa: **Frankfurt** oder **Amsterdam**)
+6. Notiere dir nach der Bestellung:
+   - Die **IP-Adresse** deines VPS (z.B. `95.216.xxx.xxx`)
+   - Das **Root-Passwort** (im Hostinger-Dashboard unter VPS → Zugangsdaten)
+
+---
+
+### Schritt 2 – Verbindung zum Server herstellen (SSH)
+
+Du steuerst den Server über eine Kommandozeile. Das ist einfacher als es klingt.
+
+#### Windows – Bitvise SSH Client (kostenlos, einfach)
+
+1. Lade herunter: **https://www.bitvise.com/ssh-client-download** → „Download Bitvise SSH Client"
+2. Installiere und starte Bitvise
+3. Trage ein:
+   - **Host:** IP-Adresse deines VPS (z.B. `95.216.xxx.xxx`)
+   - **Port:** `22`
+   - **Username:** `root`
+   - **Initial method:** `password`
+4. Klicke auf **Log in** → gib dein Root-Passwort ein
+5. Ein schwarzes Fenster öffnet sich – das ist die Kommandozeile deines Servers
+
+#### Mac – Terminal (bereits vorinstalliert)
+
+1. Öffne das **Terminal** (`Cmd + Leertaste` → `Terminal` → Enter)
+2. Tippe (ersetze die IP mit deiner eigenen):
+   ```bash
+   ssh root@95.216.xxx.xxx
+   ```
+3. Bestätige mit `yes` wenn gefragt
+4. Gib dein Root-Passwort ein (Eingabe bleibt unsichtbar – das ist normal)
+
+---
+
+### Schritt 3 – Server aktualisieren und Docker installieren
+
+Kopiere diese Befehle **nacheinander** ins schwarze Fenster. Warte jeweils bis wieder `#` erscheint.
+
+```bash
+# 1. System aktualisieren (dauert 1–2 Minuten)
+apt-get update && apt-get upgrade -y
+
+# 2. Docker installieren (offizielles Installations-Skript)
+curl -fsSL https://get.docker.com | sh
+
+# 3. Docker automatisch beim Serverstart aktivieren
+systemctl enable docker
+systemctl start docker
+
+# 4. Prüfen ob Docker funktioniert (sollte "Docker Compose version v2.x.x" ausgeben)
+docker compose version
+```
+
+> **Was ist Docker?** Docker ist ein System, das Redline und alle seine Abhängigkeiten in einer abgeschlossenen „Box" startet. Du musst Python, Datenbanken usw. nicht manuell installieren.
+
+---
+
+### Schritt 4 – Redline-Dateien auf den Server laden
+
+```bash
+# Git installieren (falls nicht vorhanden)
+apt-get install -y git
+
+# Redline herunterladen
+git clone https://github.com/dein-org/Redline-.git /opt/redline
+
+# In den Ordner wechseln
+cd /opt/redline
+```
+
+> Falls du keinen Zugang zum GitHub-Repository hast: Lade die ZIP-Datei herunter, und übertrage sie via **SFTP** (Bitvise hat eine eingebaute SFTP-Funktion) in den Ordner `/opt/redline` auf dem Server.
+
+---
+
+### Schritt 5 – Konfigurationsdatei anlegen und anpassen
+
+```bash
+# Vorlage kopieren
+cp .env.example .env
+
+# Datei bearbeiten (nano = einfacher Text-Editor, kein Maus-Klicken nötig)
+nano .env
+```
+
+Im Editor navigierst du mit den **Pfeiltasten**. Passe diese vier Werte an:
+
+```env
+SECRET_KEY=hier-einen-langen-zufaelligen-text-eintragen
+APP_BASE_URL=https://redline.deine-domain.de
+WORKSHOP_EMAIL=werkstatt@deine-firma.de
+GRAFANA_ADMIN_PASSWORD=sicheres-grafana-passwort
+```
+
+**SECRET_KEY generieren** – öffne ein zweites Terminal-Fenster (oder Bitvise-Tab) und führe aus:
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Das Ergebnis (eine lange Buchstaben-Zahlen-Kette) komplett als `SECRET_KEY` eintragen.
+
+Speichern und Beenden: `Strg + O` → Enter → `Strg + X`
+
+---
+
+### Schritt 6 – Redline starten
+
+```bash
+cd /opt/redline
+
+# Container bauen und im Hintergrund starten
+docker compose up -d
+
+# Status prüfen – alle drei Services sollten "running" zeigen
+docker compose ps
+```
+
+Erwartete Ausgabe:
+
+```
+NAME          STATUS
+redline_app   running
+prometheus    running
+grafana       running
+```
+
+---
+
+### Schritt 7 – Nginx als Eingangstor installieren
+
+Nginx nimmt Anfragen von außen entgegen und leitet sie an Redline weiter.
+
+```bash
+# Nginx installieren
+apt-get install -y nginx
+
+# Standard-Konfiguration entfernen
+rm /etc/nginx/sites-enabled/default
+
+# Neue Konfiguration für Redline erstellen
+nano /etc/nginx/sites-available/redline
+```
+
+Füge folgenden Text ein (ersetze `redline.deine-domain.de` durch deine echte Domain):
+
+```nginx
+server {
+    listen 80;
+    server_name redline.deine-domain.de www.redline.deine-domain.de;
+
+    location / {
+        proxy_pass         http://localhost:8000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+}
+```
+
+Speichern: `Strg + O` → Enter → `Strg + X`
+
+```bash
+# Konfiguration aktivieren
+ln -s /etc/nginx/sites-available/redline /etc/nginx/sites-enabled/
+
+# Konfiguration testen (sollte "syntax is ok" ausgeben)
+nginx -t
+
+# Nginx aktivieren und starten
+systemctl enable nginx
+systemctl restart nginx
+```
+
+---
+
+### Schritt 8 – Cloudflare DNS einrichten
+
+Damit deine Domain auf den Hostinger-Server zeigt:
+
+1. Logge dich bei **dash.cloudflare.com** ein
+2. Klicke auf deine Domain
+3. Im linken Menü: **DNS** → **Records**
+4. Klicke auf **Add record** und lege zwei Einträge an:
+
+| Typ | Name | IPv4-Adresse | Proxy-Status |
+|-----|------|-------------|--------------|
+| `A` | `redline` | `95.216.xxx.xxx` (deine VPS-IP) | Oranges Wolken-Symbol ✓ aktiviert |
+| `A` | `www` | `95.216.xxx.xxx` (deine VPS-IP) | Oranges Wolken-Symbol ✓ aktiviert |
+
+> Falls du die Domain direkt (ohne Subdomain) nutzen möchtest, trage beim Name `@` ein.
+
+5. Klicke jeweils auf **Save**
+
+> **Warum das orangefarbene Wolken-Symbol?** Das bedeutet, dass Cloudflare als Vermittler dazwischengeschaltet ist. Du bekommst damit automatisch **HTTPS, DDoS-Schutz und Geschwindigkeit** – kostenlos.
+
+---
+
+### Schritt 9 – HTTPS mit Cloudflare aktivieren
+
+1. In Cloudflare: Klicke im linken Menü auf **SSL/TLS**
+2. Stelle den Modus auf **Flexible** (für den Start ausreichend)
+   - Cloudflare verschlüsselt die Verbindung zwischen Besucher und Cloudflare
+3. Warte **5–15 Minuten** bis die DNS-Änderungen weltweit verteilt sind
+4. Teste im Browser: `https://redline.deine-domain.de`
+
+> DNS-Propagation prüfen: **https://dnschecker.org** → deine Domain eingeben → prüfen ob die IP-Adresse überall korrekt angezeigt wird.
+
+---
+
+### Schritt 10 – Let's Encrypt Zertifikat (empfohlen, für SSL-Modus „Full")
+
+Für höhere Sicherheit kannst du ein eigenes SSL-Zertifikat auf dem Server installieren und Cloudflare auf **Full (strict)** stellen.
+
+```bash
+# Certbot installieren
+apt-get install -y certbot python3-certbot-nginx
+
+# Zertifikat beantragen (ersetze die Domain)
+certbot --nginx -d redline.deine-domain.de
+```
+
+Certbot fragt nach:
+- Deiner **E-Mail-Adresse** (für Verlängerungsbenachrichtigungen)
+- Zustimmung zu den Nutzungsbedingungen → `Y`
+- HTTP→HTTPS Weiterleitung → `2` (Ja, empfohlen)
+
+Danach in Cloudflare: **SSL/TLS** → Modus auf **Full (strict)** stellen.
+
+Das Zertifikat erneuert sich automatisch alle 90 Tage.
+
+---
+
+### Schritt 11 – Firewall auf dem Hostinger-VPS prüfen
+
+Im Hostinger-Dashboard unter **VPS → Firewall** (oder direkt auf dem Server):
+
+```bash
+# UFW Firewall aktivieren und Ports freigeben
+ufw allow ssh
+ufw allow http
+ufw allow https
+ufw enable
+ufw status
+```
+
+| Port | Protokoll | Zweck |
+|------|-----------|-------|
+| `22` | TCP | SSH (Serverzugang) |
+| `80` | TCP | HTTP (wird zu HTTPS umgeleitet) |
+| `443` | TCP | HTTPS |
+
+> Ports 8000 (Redline), 9090 (Prometheus) und 3000 (Grafana) **nicht** öffentlich öffnen – diese sind nur intern erreichbar.
+
+---
+
+### Schritt 12 – Erster Login und Passwörter ändern
+
+1. Öffne `https://redline.deine-domain.de` im Browser
+2. Logge dich mit `admin` / `admin123` ein
+3. **Sofort alle Standard-Passwörter ändern!**
+   - Admin → Benutzerverwaltung → für jeden Benutzer „Passwort ändern" klicken
+4. Lege ein erstes Gerät an und teste den QR-Code mit dem iPhone
+
+---
+
+### Schritt 13 – Updates einspielen
+
+Wenn eine neue Version verfügbar ist:
+
+```bash
+cd /opt/redline
+
+# Neuen Code herunterladen
+git pull origin main
+
+# Container neu bauen und starten
+docker compose up -d --build
+
+# Datenbank-Migrationen anwenden (falls nötig)
+docker compose exec redline flask --app app db upgrade
+```
+
+---
+
+### Häufige Probleme bei Hostinger + Cloudflare
+
+| Problem | Ursache | Lösung |
+|---------|---------|--------|
+| Domain nicht erreichbar | DNS noch nicht verteilt | Warte 5–15 Min; prüfe mit https://dnschecker.org |
+| „This site can't be reached" | Nginx läuft nicht | `systemctl status nginx` → ggf. `systemctl restart nginx` |
+| SSL-Fehler im Browser | Cloudflare-Modus falsch | SSL/TLS → Flexible (ohne Certbot) oder Full (mit Certbot) |
+| QR-Codes zeigen auf localhost | APP_BASE_URL falsch | `.env` anpassen → `docker compose up -d --force-recreate` |
+| Docker startet nicht | Konfigurationsfehler | `docker compose logs` lesen und Fehlermeldung googeln |
+| „502 Bad Gateway" | Redline-Container gestoppt | `docker compose ps` → gestoppte Container mit `docker compose up -d` starten |
+| Seite funktioniert ohne HTTPS | Cloudflare Proxy deaktiviert | DNS-Eintrag: oranges Wolken-Symbol aktivieren |
 
 ---
 

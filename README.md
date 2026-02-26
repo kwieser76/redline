@@ -27,8 +27,9 @@ Vollständige Berechtigungsmatrix → **[docs/ROLLEN.md](docs/ROLLEN.md)**
 | [Rollen-Übersicht](docs/ROLLEN.md) | Alle Rollen, Berechtigungsmatrix, Rollen anlegen |
 | [API-Referenz](docs/API.md) | Alle REST-Endpunkte, Authentifizierung, Request/Response-Format, curl-Beispiele |
 | [Technische Dokumentation](docs/TECHNICAL.md) | Architektur, Datenbankschema, Sicherheit, Deployment, NFR-Übersicht |
-| [Installations-Anleitung](docs/INSTALLATION.md) | Lokale Entwicklung, Docker Compose, Bare-Metal (Gunicorn + Nginx), Migrationen |
+| [Installations-Anleitung](docs/INSTALLATION.md) | Lokale Entwicklung, Docker Compose, Hostinger + Cloudflare (Nicht-Techniker), Bare-Metal, Migrationen |
 | [Fachliche Dokumentation](docs/BUSINESS.md) | Geschäftsprozesse, Anwendungsfälle, Rollen, Datenstrategie, Glossar |
+| [Test-Dokumentation](docs/TESTING.md) | Teststruktur, pytest-Fixtures, alle Testdateien, Tests ausführen |
 | [Changelog](CHANGELOG.md) | Versionshistorie mit allen Änderungen |
 
 ---
