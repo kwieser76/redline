@@ -6,7 +6,7 @@ the UI and FileMaker integration:
   Device.status          : "Verfügbar" | "Wartung" | "Reserviert"
   Defect.status          : "Offen"     | "Behoben"
   Defect.werkstatt_status: "Ausstehend" | "In Prüfung" | "In Reparatur" | "Repariert"
-  User roles             : is_admin=True | is_disponent=True | is_werkstatt=True | (none → community)
+  User roles             : is_admin | is_disponent | is_werkstatt | is_api_user | (none → community)
 """
 
 from datetime import datetime, timezone
@@ -28,6 +28,7 @@ class User(UserMixin, db.Model):
     is_disponent = db.Column(db.Boolean, default=False, nullable=False)
     is_werkstatt = db.Column(db.Boolean, default=False, nullable=False)
     is_community = db.Column(db.Boolean, default=False, nullable=False)
+    is_api_user = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -41,6 +42,8 @@ class User(UserMixin, db.Model):
             return "disponent"
         if self.is_werkstatt:
             return "werkstatt"
+        if self.is_api_user:
+            return "api"
         return "community"
 
     def set_password(self, password: str) -> None:
@@ -51,6 +54,25 @@ class User(UserMixin, db.Model):
 
     def __repr__(self) -> str:
         return f"<User {self.username} role={self.role}>"
+
+
+class DeviceCategory(db.Model):
+    """Product category for devices (e.g. Ton, Licht, Bühne, Video)."""
+
+    __tablename__ = "device_categories"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    color = db.Column(db.String(7), default="#6b7280", nullable=False)  # CSS hex color
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    devices = db.relationship("Device", back_populates="product_category", lazy=True)
+
+    def __repr__(self) -> str:
+        return f"<DeviceCategory {self.name}>"
 
 
 class Device(db.Model):
@@ -66,10 +88,17 @@ class Device(db.Model):
         nullable=False,
         index=True,
     )  # "Verfügbar" | "Wartung" | "Reserviert"
+    category_id = db.Column(
+        db.Integer, db.ForeignKey("device_categories.id"), nullable=True, index=True
+    )
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
+    # Relationships
+    product_category = db.relationship(
+        "DeviceCategory", back_populates="devices", lazy=True
+    )
     # Cascade: deleting a device also deletes all its defect records.
     defects = db.relationship(
         "Defect",

@@ -13,7 +13,7 @@ import pytest
 
 from app import create_app
 from config import Config, TestConfig
-from models import Comment, db as _db, Defect, DefectCategory, Device, EmailRecipient, User
+from models import Comment, db as _db, Defect, DefectCategory, Device, DeviceCategory, EmailRecipient, User
 
 
 # --------------------------------------------------------------------------- #
@@ -42,11 +42,15 @@ def clean_db(app):
         Comment.query.delete()
         Defect.query.delete()
         Device.query.delete()
+        seeded_cat_names = [name for name, _ in Config.DEVICE_CATEGORIES]
+        DeviceCategory.query.filter(
+            ~DeviceCategory.name.in_(seeded_cat_names)
+        ).delete(synchronize_session="fetch")
         EmailRecipient.query.filter(
             EmailRecipient.email != Config.WORKSHOP_EMAIL
         ).delete()
         User.query.filter(
-            ~User.username.in_(["admin", "team_login", "disponent", "werkstatt"])
+            ~User.username.in_(["admin", "team_login", "disponent", "werkstatt", "api"])
         ).delete()
         DefectCategory.query.filter(
             ~DefectCategory.name.in_(Config.DEFECT_CATEGORIES)
@@ -75,6 +79,13 @@ def admin_headers():
 def team_headers():
     """HTTP Basic Auth header for the seeded team_login user."""
     creds = base64.b64encode(b"team_login:team2025").decode()
+    return {"Authorization": f"Basic {creds}"}
+
+
+@pytest.fixture
+def api_headers():
+    """HTTP Basic Auth header for the seeded api user (is_api_user=True)."""
+    creds = base64.b64encode(b"api:api2025").decode()
     return {"Authorization": f"Basic {creds}"}
 
 

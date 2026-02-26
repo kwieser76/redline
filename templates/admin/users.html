@@ -36,7 +36,14 @@
         <input type="checkbox" id="is_werkstatt" name="is_werkstatt" style="width:auto;accent-color:var(--blue);" />
         <label for="is_werkstatt" style="text-transform:none;font-size:15px;letter-spacing:0;margin-bottom:0;">Werkstatt-Rechte</label>
       </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-bottom:0;">
+        <input type="checkbox" id="is_api_user" name="is_api_user" style="width:auto;accent-color:var(--blue);" />
+        <label for="is_api_user" style="text-transform:none;font-size:15px;letter-spacing:0;margin-bottom:0;">API-Zugriff</label>
+      </div>
     </div>
+    <p style="font-size:13px;color:var(--gray-600);margin:6px 0 14px;">
+      <strong>API-Zugriff:</strong> Dieser Benutzer kann ausschliesslich die REST-API nutzen und hat keinen Zugang zur Web-Oberfläche.
+    </p>
     <button type="submit" class="btn btn-primary">Benutzer anlegen</button>
   </form>
 </div>
@@ -68,6 +75,8 @@
             <span class="badge" style="background:#fff3cd;color:#856404;">Disponent</span>
             {% elif user.is_werkstatt %}
             <span class="badge" style="background:#ffe4cc;color:#7a3800;">Werkstatt</span>
+            {% elif user.is_api_user %}
+            <span class="badge" style="background:#1a1a1a;color:#fff;">API</span>
             {% else %}
             <span class="badge badge-resolved">Standard</span>
             {% endif %}

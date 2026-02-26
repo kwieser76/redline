@@ -95,13 +95,13 @@ class TestDefectLifecycle:
             d = Device.query.filter_by(device_id=defect["device_id"]).first()
             assert d.status == "Verfügbar"
 
-    def test_full_api_lifecycle(self, app, client, admin_headers, team_headers):
+    def test_full_api_lifecycle(self, app, client, api_headers):
         """Complete lifecycle via REST API."""
         # Create device
         r = client.post(
             "/api/v1/devices",
             json={"device_id": "API-LC-001", "name": "API Lifecycle Device"},
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert r.status_code == 201
         assert r.get_json()["status"] == "Verfügbar"
@@ -116,26 +116,26 @@ class TestDefectLifecycle:
                 "event_name": "API Event",
                 "project_number": "PRJ-API-LC",
             },
-            headers=team_headers,
+            headers=api_headers,
         )
         assert r.status_code == 201
         defect_id = r.get_json()["id"]
 
         # Verify device in Wartung
-        r = client.get("/api/v1/devices/API-LC-001", headers=admin_headers)
+        r = client.get("/api/v1/devices/API-LC-001", headers=api_headers)
         assert r.get_json()["status"] == "Wartung"
 
         # Resolve defect
         r = client.patch(
             f"/api/v1/defects/{defect_id}/resolve",
             json={"resolution_notes": "Behoben via API"},
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert r.status_code == 200
         assert r.get_json()["status"] == "Behoben"
 
         # Verify device back to Verfügbar
-        r = client.get("/api/v1/devices/API-LC-001", headers=admin_headers)
+        r = client.get("/api/v1/devices/API-LC-001", headers=api_headers)
         assert r.get_json()["status"] == "Verfügbar"
 
 
@@ -160,18 +160,18 @@ class TestMultiDefectDevice:
         )
 
     def test_device_stays_wartung_when_one_defect_remains(
-        self, app, client, admin_headers, device
+        self, app, client, api_headers, device
     ):
         # Report 2 defects
-        r1 = self._report_defect(client, admin_headers, device["device_id"], "Defect A")
-        r2 = self._report_defect(client, admin_headers, device["device_id"], "Defect B")
+        r1 = self._report_defect(client, api_headers, device["device_id"], "Defect A")
+        r2 = self._report_defect(client, api_headers, device["device_id"], "Defect B")
         id1, id2 = r1.get_json()["id"], r2.get_json()["id"]
 
         # Resolve only the first
         client.patch(
             f"/api/v1/defects/{id1}/resolve",
             json={"resolution_notes": "fixed A"},
-            headers=admin_headers,
+            headers=api_headers,
         )
 
         with app.app_context():
@@ -180,24 +180,24 @@ class TestMultiDefectDevice:
             assert d.open_defect_count == 1
 
     def test_device_becomes_verfuegbar_when_all_resolved(
-        self, app, client, admin_headers, device
+        self, app, client, api_headers, device
     ):
-        r1 = self._report_defect(client, admin_headers, device["device_id"], "Defect X")
-        r2 = self._report_defect(client, admin_headers, device["device_id"], "Defect Y")
+        r1 = self._report_defect(client, api_headers, device["device_id"], "Defect X")
+        r2 = self._report_defect(client, api_headers, device["device_id"], "Defect Y")
         id1, id2 = r1.get_json()["id"], r2.get_json()["id"]
 
-        client.patch(f"/api/v1/defects/{id1}/resolve", json={}, headers=admin_headers)
-        client.patch(f"/api/v1/defects/{id2}/resolve", json={}, headers=admin_headers)
+        client.patch(f"/api/v1/defects/{id1}/resolve", json={}, headers=api_headers)
+        client.patch(f"/api/v1/defects/{id2}/resolve", json={}, headers=api_headers)
 
         with app.app_context():
             d = Device.query.filter_by(device_id=device["device_id"]).first()
             assert d.status == "Verfügbar"
             assert d.open_defect_count == 0
 
-    def test_open_defect_count_is_accurate(self, app, client, admin_headers, device):
-        self._report_defect(client, admin_headers, device["device_id"], "One")
-        self._report_defect(client, admin_headers, device["device_id"], "Two")
-        self._report_defect(client, admin_headers, device["device_id"], "Three")
+    def test_open_defect_count_is_accurate(self, app, client, api_headers, device):
+        self._report_defect(client, api_headers, device["device_id"], "One")
+        self._report_defect(client, api_headers, device["device_id"], "Two")
+        self._report_defect(client, api_headers, device["device_id"], "Three")
 
         with app.app_context():
             d = Device.query.filter_by(device_id=device["device_id"]).first()
@@ -225,60 +225,60 @@ class TestEventReporting:
         )
 
     def test_events_endpoint_lists_distinct_projects(
-        self, client, admin_headers, device
+        self, client, api_headers, device
     ):
-        self._create_defect(client, admin_headers, device["device_id"],
+        self._create_defect(client, api_headers, device["device_id"],
                             "Summer Fest", "PRJ-SF-01")
-        self._create_defect(client, admin_headers, device["device_id"],
+        self._create_defect(client, api_headers, device["device_id"],
                             "Winter Gala", "PRJ-WG-01")
 
-        resp = client.get("/api/v1/events", headers=admin_headers)
+        resp = client.get("/api/v1/events", headers=api_headers)
         projects = [e["project_number"] for e in resp.get_json()]
         assert "PRJ-SF-01" in projects
         assert "PRJ-WG-01" in projects
 
     def test_event_defects_returns_correct_count(
-        self, client, admin_headers, device
+        self, client, api_headers, device
     ):
         for i in range(3):
             self._create_defect(
-                client, admin_headers, device["device_id"],
+                client, api_headers, device["device_id"],
                 "Summer Fest", "PRJ-COUNT-01", f"Defect {i}"
             )
-        resp = client.get("/api/v1/events/PRJ-COUNT-01", headers=admin_headers)
+        resp = client.get("/api/v1/events/PRJ-COUNT-01", headers=api_headers)
         assert resp.get_json()["defect_count"] == 3
 
     def test_defect_filter_by_status_offen(
-        self, client, admin_headers, device
+        self, client, api_headers, device
     ):
-        r = self._create_defect(client, admin_headers, device["device_id"],
+        r = self._create_defect(client, api_headers, device["device_id"],
                                 "Filter Event", "PRJ-FILT-01")
         defect_id = r.get_json()["id"]
 
         # Open defects
         resp = client.get(
             "/api/v1/defects?status=Offen&project_number=PRJ-FILT-01",
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.get_json()["total"] == 1
 
         # Resolve, then filter again
         client.patch(
-            f"/api/v1/defects/{defect_id}/resolve", json={}, headers=admin_headers
+            f"/api/v1/defects/{defect_id}/resolve", json={}, headers=api_headers
         )
         resp = client.get(
             "/api/v1/defects?status=Offen&project_number=PRJ-FILT-01",
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.get_json()["total"] == 0
 
     def test_event_filter_by_event_name_partial_match(
-        self, client, admin_headers, device
+        self, client, api_headers, device
     ):
-        self._create_defect(client, admin_headers, device["device_id"],
+        self._create_defect(client, api_headers, device["device_id"],
                             "Sommerfestival 2025", "PRJ-PART-01")
         resp = client.get(
-            "/api/v1/defects?event_name=Sommer", headers=admin_headers
+            "/api/v1/defects?event_name=Sommer", headers=api_headers
         )
         assert resp.get_json()["total"] >= 1
 
@@ -527,9 +527,9 @@ class TestQRCodeGeneration:
         body = resp.data.decode("utf-8")
         assert f"/report/{device['device_id']}" in body
 
-    def test_api_qr_endpoint_returns_png(self, client, admin_headers, device):
+    def test_api_qr_endpoint_returns_png(self, client, api_headers, device):
         resp = client.get(
-            f"/api/v1/devices/{device['device_id']}/qr", headers=admin_headers
+            f"/api/v1/devices/{device['device_id']}/qr", headers=api_headers
         )
         assert resp.status_code == 200
         assert resp.content_type == "image/png"
@@ -601,8 +601,8 @@ class TestReporterTracking:
             )
             assert df.reporter == "team_login"
 
-    def test_reporter_is_admin_when_using_admin_api(
-        self, app, client, admin_headers, device
+    def test_reporter_is_api_user_when_using_api(
+        self, app, client, api_headers, device
     ):
         resp = client.post(
             "/api/v1/defects",
@@ -613,25 +613,26 @@ class TestReporterTracking:
                 "event_name": "API Event",
                 "project_number": "PRJ-REP-02",
             },
-            headers=admin_headers,
+            headers=api_headers,
         )
-        assert resp.get_json()["reporter"] == "admin"
+        assert resp.get_json()["reporter"] == "api"
 
-    def test_reporter_is_team_login_when_using_team_api(
+    def test_web_ui_user_blocked_from_api(
         self, app, client, team_headers, device
     ):
+        """Web-UI users (team_login) must not be able to submit via the API."""
         resp = client.post(
             "/api/v1/defects",
             json={
                 "device_id": device["device_id"],
                 "category": "Sonstiges",
-                "description": "Team API Reporter",
+                "description": "Should be blocked",
                 "event_name": "API Event",
                 "project_number": "PRJ-REP-03",
             },
             headers=team_headers,
         )
-        assert resp.get_json()["reporter"] == "team_login"
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -670,12 +671,12 @@ class TestDeviceOnboarding:
         )
         assert "bereits" in resp.data.decode("utf-8").lower()
 
-    def test_new_device_appears_in_api_list(self, app, admin_client, client, admin_headers):
+    def test_new_device_appears_in_api_list(self, app, admin_client, client, api_headers):
         admin_client.post(
             "/admin/devices",
             data={"action": "add", "device_id": "ON-002", "name": "API List Test"},
         )
-        resp = client.get("/api/v1/devices", headers=admin_headers)
+        resp = client.get("/api/v1/devices", headers=api_headers)
         device_ids = [d["device_id"] for d in resp.get_json()]
         assert "ON-002" in device_ids
 

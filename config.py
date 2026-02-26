@@ -109,6 +109,17 @@ class Config:
         "Sonstiges",
     ]
 
+    # Default device/product categories with brand colors
+    # Format: (name, hex_color)
+    DEVICE_CATEGORIES: list = [
+        ("Ton",      "#3b82f6"),  # blue
+        ("Licht",    "#f59e0b"),  # amber
+        ("Bühne",    "#8b5cf6"),  # purple
+        ("Video",    "#ef4444"),  # red
+        ("Strom",    "#10b981"),  # green
+        ("Sonstiges","#6b7280"),  # gray
+    ]
+
     # ------------------------------------------------------------------ #
     #  Validation                                                          #
     # ------------------------------------------------------------------ #

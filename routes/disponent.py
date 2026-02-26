@@ -21,7 +21,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
-from models import Defect, DefectCategory, Device, db
+from models import Defect, DefectCategory, Device, DeviceCategory, db
 
 disponent_bp = Blueprint("disponent", __name__, url_prefix="/disponent")
 
@@ -60,7 +60,9 @@ def _parse_date(value: str | None, default: date) -> date:
         return default
 
 
-def _availability_query(from_date: date, to_date: date, category: str):
+def _availability_query(
+    from_date: date, to_date: date, category: str, device_cat_id: int | None = None
+):
     """Return defects whose maintenance window overlaps [from_date, to_date].
 
     A defect makes a device unavailable from created_at until resolved_at
@@ -85,6 +87,8 @@ def _availability_query(from_date: date, to_date: date, category: str):
     )
     if category:
         query = query.filter(Defect.category == category)
+    if device_cat_id:
+        query = query.filter(Device.category_id == device_cat_id)
 
     return query.order_by(Defect.created_at.desc()).all()
 
@@ -140,12 +144,14 @@ def availability():
         to_date = from_date
 
     category = request.args.get("category", "").strip()
-    defects = _availability_query(from_date, to_date, category)
+    device_cat_id = request.args.get("device_cat", type=int)
+    defects = _availability_query(from_date, to_date, category, device_cat_id)
 
     categories = [
         c.name
         for c in DefectCategory.query.order_by(DefectCategory.sort_order).all()
     ]
+    device_categories = DeviceCategory.query.order_by(DeviceCategory.sort_order).all()
 
     return render_template(
         "disponent/availability.html",
@@ -153,7 +159,9 @@ def availability():
         from_date=from_date,
         to_date=to_date,
         category=category,
+        device_cat_id=device_cat_id,
         categories=categories,
+        device_categories=device_categories,
     )
 
 
@@ -167,8 +175,9 @@ def availability_export():
     if to_date < from_date:
         to_date = from_date
     category = request.args.get("category", "").strip()
+    device_cat_id = request.args.get("device_cat", type=int)
 
-    defects = _availability_query(from_date, to_date, category)
+    defects = _availability_query(from_date, to_date, category, device_cat_id)
 
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";")
@@ -176,7 +185,8 @@ def availability_export():
         [
             "Geräte-ID",
             "Gerätename",
-            "Kategorie",
+            "Produktkategorie",
+            "Defektkategorie",
             "Grund",
             "Seit",
             "Bis",
@@ -191,6 +201,7 @@ def availability_export():
             [
                 d.device.device_id,
                 d.device.name,
+                d.device.product_category.name if d.device.product_category else "",
                 d.category,
                 d.description,
                 d.created_at.strftime("%d.%m.%Y %H:%M"),
@@ -237,9 +248,11 @@ def tile_detail(filter_key: str):
     else:
         device_list = Device.query.order_by(Device.name).all()
 
+    device_categories = DeviceCategory.query.order_by(DeviceCategory.sort_order).all()
     return render_template(
         "disponent/tile_detail.html",
         devices=device_list,
         title=title,
         filter_key=filter_key,
+        device_categories=device_categories,
     )

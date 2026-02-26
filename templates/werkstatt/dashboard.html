@@ -25,7 +25,12 @@
     <!-- Device + Category -->
     <div>
       <div style="font-weight:700;font-size:15px;">{{ defect.device.name }}</div>
-      <div style="font-size:12px;color:var(--red);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">{{ defect.device.device_id }}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--red);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">{{ defect.device.device_id }}</span>
+        {% if defect.device.product_category %}
+        <span class="cat-badge" style="background:{{ defect.device.product_category.color }};font-size:11px;padding:1px 8px;">{{ defect.device.product_category.name }}</span>
+        {% endif %}
+      </div>
       <div style="font-size:13px;color:var(--gray-600);margin-top:2px;">{{ defect.category }}</div>
       <div style="font-size:12px;color:var(--gray-600);margin-top:2px;">{{ defect.description | truncate(80) }}</div>
     </div>

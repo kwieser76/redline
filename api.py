@@ -2,7 +2,8 @@
 Redline REST JSON API – v1
 
 Base path : /api/v1
-Auth      : HTTP Basic Auth (same credentials as the web UI)
+Auth      : HTTP Basic Auth  –  requires a dedicated api_user account.
+            Web-UI roles (admin, disponent, werkstatt) cannot use the API.
 Format    : application/json
 
 Endpoints
@@ -53,7 +54,12 @@ def _json_error(message: str, status: int):
 
 
 def _require_auth(admin_only: bool = False):
-    """Decorator factory – enforces HTTP Basic Auth."""
+    """Decorator factory – enforces HTTP Basic Auth.
+
+    Only users with ``is_api_user=True`` may authenticate.  All api_users
+    have full access to every endpoint; the *admin_only* parameter is kept
+    for documentation purposes only.
+    """
 
     def decorator(f):
         @functools.wraps(f)
@@ -64,9 +70,13 @@ def _require_auth(admin_only: bool = False):
             user = User.query.filter_by(username=auth.username).first()
             if not user or not user.check_password(auth.password):
                 return _json_error("Invalid credentials.", 401)
-            if admin_only and not user.is_admin:
-                return _json_error("Admin access required.", 403)
-            # Make the authenticated user available in the request context.
+            if not user.is_api_user:
+                return _json_error(
+                    "API access requires a dedicated api_user account. "
+                    "Web-UI accounts (admin, disponent, werkstatt) cannot "
+                    "authenticate to the API.",
+                    403,
+                )
             g.api_user = user
             return f(*args, **kwargs)
 
