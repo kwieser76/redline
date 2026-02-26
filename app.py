@@ -107,6 +107,7 @@ def create_app(config_class=None) -> Flask:
 
     @app.context_processor
     def inject_app_version():
+        from datetime import datetime as _dt
         db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
         db_path = (
             db_uri.replace("sqlite:///", "")
@@ -117,6 +118,7 @@ def create_app(config_class=None) -> Flask:
             "app_version": APP_VERSION,
             "show_debug_info": app.config.get("SHOW_DEBUG_INFO", False),
             "app_db_path": db_path,
+            "current_year": _dt.now().year,
         }
 
     # ---------------------------------------------------------------------- #
@@ -173,6 +175,8 @@ def create_app(config_class=None) -> Flask:
                 return redirect(url_for("disponent.dashboard"))
             if current_user.is_werkstatt:
                 return redirect(url_for("werkstatt.dashboard"))
+            if current_user.is_api_user:
+                return redirect(url_for("auth.logout"))
             return redirect(url_for("admin.all_defects"))
         return redirect(url_for("auth.login"))
 
@@ -263,6 +267,15 @@ def _seed_db() -> None:
         db.session.add(ws)
         logger.warning(
             "Created default werkstatt user (werkstatt / werk2025). "
+            "CHANGE THIS PASSWORD before going live!"
+        )
+
+    if not User.query.filter_by(username="api").first():
+        api_user = User(username="api", is_api_user=True)
+        api_user.set_password("api2025")
+        db.session.add(api_user)
+        logger.warning(
+            "Created default API user (api / api2025). "
             "CHANGE THIS PASSWORD before going live!"
         )
 

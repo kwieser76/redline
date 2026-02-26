@@ -50,7 +50,7 @@ def clean_db(app):
             EmailRecipient.email != Config.WORKSHOP_EMAIL
         ).delete()
         User.query.filter(
-            ~User.username.in_(["admin", "team_login", "disponent", "werkstatt"])
+            ~User.username.in_(["admin", "team_login", "disponent", "werkstatt", "api"])
         ).delete()
         DefectCategory.query.filter(
             ~DefectCategory.name.in_(Config.DEFECT_CATEGORIES)
@@ -79,6 +79,13 @@ def admin_headers():
 def team_headers():
     """HTTP Basic Auth header for the seeded team_login user."""
     creds = base64.b64encode(b"team_login:team2025").decode()
+    return {"Authorization": f"Basic {creds}"}
+
+
+@pytest.fixture
+def api_headers():
+    """HTTP Basic Auth header for the seeded api user (is_api_user=True)."""
+    creds = base64.b64encode(b"api:api2025").decode()
     return {"Authorization": f"Basic {creds}"}
 
 

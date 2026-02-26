@@ -121,8 +121,9 @@ class TestXSSContainment:
         )
         resp = admin_client.get("/admin/devices")
         body = resp.data.decode("utf-8")
-        # The *unescaped* img tag must not be present; escaped &lt;img ...&gt; is harmless
-        assert "<img " not in body, "Raw <img> tag found in response – XSS risk"
+        # The raw XSS <img src=x (unquoted, no /) must not appear; the footer logo uses quoted src
+        assert "<img src=x" not in body, "Raw XSS <img src=x payload found unescaped in response"
+        assert "&lt;img" in body, "Escaped form of XSS <img payload not found – escaping may be missing"
 
     def test_xss_in_defect_description_escaped_in_history(self, app, admin_client):
         admin_client.post(
@@ -141,7 +142,7 @@ class TestXSSContainment:
         resp = admin_client.get("/admin/history/XSS-003")
         body = resp.data.decode("utf-8")
         # Unescaped <img> must not appear; Jinja2 auto-escape renders it as &lt;img&gt;
-        assert "<img " not in body, "Raw <img> tag found in defect history – XSS risk"
+        assert "<img src=x" not in body, "Raw XSS <img src=x payload found unescaped in defect history"
 
     def test_xss_in_device_name_escaped_on_report_form(self, app, admin_client, team_client):
         admin_client.post(
@@ -233,47 +234,47 @@ class TestMalformedAuthHeader:
 class TestInjectionPayloadsInFilters:
     """Injection-like strings in query parameters must not cause errors or data leaks."""
 
-    def test_sql_wildcard_in_event_name_filter(self, client, admin_headers):
+    def test_sql_wildcard_in_event_name_filter(self, client, api_headers):
         """% and _ wildcards must not cause errors or unexpected data leaks."""
-        resp = client.get("/api/v1/defects?event_name=%25", headers=admin_headers)
+        resp = client.get("/api/v1/defects?event_name=%25", headers=api_headers)
         assert resp.status_code == 200
 
-    def test_sql_comment_in_device_id_filter(self, client, admin_headers):
+    def test_sql_comment_in_device_id_filter(self, client, api_headers):
         resp = client.get(
             "/api/v1/defects?device_id='; DROP TABLE devices; --",
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.status_code in (200, 404)  # must not 500
 
-    def test_unicode_in_event_name_filter(self, client, admin_headers):
+    def test_unicode_in_event_name_filter(self, client, api_headers):
         resp = client.get(
             "/api/v1/defects?event_name=Sömmer%C3%BCbung",
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.status_code == 200
 
-    def test_null_byte_in_filter_does_not_crash(self, client, admin_headers):
+    def test_null_byte_in_filter_does_not_crash(self, client, api_headers):
         resp = client.get(
             "/api/v1/defects?event_name=test%00injection",
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.status_code in (200, 400)
 
-    def test_very_long_filter_value_does_not_crash(self, client, admin_headers):
+    def test_very_long_filter_value_does_not_crash(self, client, api_headers):
         long_value = "A" * 5000
         resp = client.get(
             f"/api/v1/defects?event_name={long_value}",
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.status_code in (200, 400, 414)
 
     def test_sql_injection_in_project_number_returns_empty_not_all(
-        self, client, admin_headers, defect
+        self, client, api_headers, defect
     ):
         """A SQL injection attempt must not return unexpected rows."""
         resp = client.get(
             "/api/v1/defects?project_number=' OR '1'='1",
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.status_code == 200
         # Should return 0 results – not all defects
@@ -293,19 +294,19 @@ class TestInjectionPayloadsInFilters:
 class TestPathTraversal:
     """Device IDs with special path characters must not cause traversal or 500s."""
 
-    def test_device_id_with_dot_dot_returns_404(self, client, admin_headers):
-        resp = client.get("/api/v1/devices/../admin", headers=admin_headers)
+    def test_device_id_with_dot_dot_returns_404(self, client, api_headers):
+        resp = client.get("/api/v1/devices/../admin", headers=api_headers)
         assert resp.status_code in (404, 400)
 
-    def test_device_id_with_slash_returns_404(self, client, admin_headers):
+    def test_device_id_with_slash_returns_404(self, client, api_headers):
         # URL-encoded slash in device_id
-        resp = client.get("/api/v1/devices/FOO%2FBAR", headers=admin_headers)
+        resp = client.get("/api/v1/devices/FOO%2FBAR", headers=api_headers)
         assert resp.status_code in (404, 400, 200)  # must not 500
 
     def test_nonexistent_device_id_with_special_chars_returns_404(
-        self, client, admin_headers
+        self, client, api_headers
     ):
-        resp = client.get("/api/v1/devices/device<script>", headers=admin_headers)
+        resp = client.get("/api/v1/devices/device<script>", headers=api_headers)
         assert resp.status_code in (404, 400)
 
 
@@ -497,13 +498,13 @@ class TestNoInternalErrorLeakage:
                 f"Possible stack trace leaked: found {marker!r} in 404 response"
             )
 
-    def test_api_404_contains_no_stack_trace(self, client, admin_headers):
-        resp = client.get("/api/v1/devices/GHOST-SEC-999", headers=admin_headers)
+    def test_api_404_contains_no_stack_trace(self, client, api_headers):
+        resp = client.get("/api/v1/devices/GHOST-SEC-999", headers=api_headers)
         for marker in self.STACK_TRACE_MARKERS:
             assert marker not in resp.data.lower()
 
-    def test_api_400_contains_no_stack_trace(self, client, admin_headers):
-        resp = client.post("/api/v1/devices", json={}, headers=admin_headers)
+    def test_api_400_contains_no_stack_trace(self, client, api_headers):
+        resp = client.post("/api/v1/devices", json={}, headers=api_headers)
         for marker in self.STACK_TRACE_MARKERS:
             assert marker not in resp.data.lower()
 

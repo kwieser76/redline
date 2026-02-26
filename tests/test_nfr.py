@@ -37,8 +37,8 @@ class TestSecurityHeaders:
     def test_headers_on_admin_dashboard(self, admin_client):
         self._assert_headers(admin_client.get("/admin/"))
 
-    def test_headers_on_api_response(self, client, admin_headers):
-        self._assert_headers(client.get("/api/v1/devices", headers=admin_headers))
+    def test_headers_on_api_response(self, client, api_headers):
+        self._assert_headers(client.get("/api/v1/devices", headers=api_headers))
 
     def test_headers_on_404_error(self, client):
         self._assert_headers(client.get("/this-route-does-not-exist-xyz"))
@@ -77,8 +77,8 @@ class TestWWWAuthenticate:
         assert resp.status_code == 401
         assert "WWW-Authenticate" in resp.headers
 
-    def test_no_www_authenticate_on_200(self, client, admin_headers):
-        resp = client.get("/api/v1/devices", headers=admin_headers)
+    def test_no_www_authenticate_on_200(self, client, api_headers):
+        resp = client.get("/api/v1/devices", headers=api_headers)
         assert resp.status_code == 200
         assert "WWW-Authenticate" not in resp.headers
 
@@ -90,18 +90,18 @@ class TestWWWAuthenticate:
 class TestAPIResponseContract:
     """API responses must be well-formed JSON with consistent shapes."""
 
-    def test_error_responses_contain_error_key(self, client, admin_headers):
+    def test_error_responses_contain_error_key(self, client, api_headers):
         cases = [
             client.get("/api/v1/devices"),                               # 401
-            client.get("/api/v1/devices/GHOST-999", headers=admin_headers),  # 404
-            client.post("/api/v1/devices", json={}, headers=admin_headers),  # 400
+            client.get("/api/v1/devices/GHOST-999", headers=api_headers),  # 404
+            client.post("/api/v1/devices", json={}, headers=api_headers),  # 400
         ]
         for resp in cases:
             data = resp.get_json()
             assert data is not None, "Response body is not JSON"
             assert "error" in data, f"'error' key missing in: {data}"
 
-    def test_successful_responses_are_json(self, client, admin_headers, device):
+    def test_successful_responses_are_json(self, client, api_headers, device):
         endpoints = [
             "/api/v1/devices",
             f"/api/v1/devices/{device['device_id']}",
@@ -109,27 +109,27 @@ class TestAPIResponseContract:
             "/api/v1/events",
         ]
         for url in endpoints:
-            resp = client.get(url, headers=admin_headers)
+            resp = client.get(url, headers=api_headers)
             assert resp.status_code == 200
             assert "application/json" in resp.content_type, (
                 f"Wrong content-type for {url}: {resp.content_type}"
             )
 
-    def test_delete_returns_empty_body_204(self, client, admin_headers, device):
+    def test_delete_returns_empty_body_204(self, client, api_headers, device):
         resp = client.delete(
-            f"/api/v1/devices/{device['device_id']}", headers=admin_headers
+            f"/api/v1/devices/{device['device_id']}", headers=api_headers
         )
         assert resp.status_code == 204
         assert resp.data == b""
 
-    def test_device_response_has_all_required_fields(self, client, admin_headers, device):
-        resp = client.get(f"/api/v1/devices/{device['device_id']}", headers=admin_headers)
+    def test_device_response_has_all_required_fields(self, client, api_headers, device):
+        resp = client.get(f"/api/v1/devices/{device['device_id']}", headers=api_headers)
         required = {"device_id", "name", "description", "status",
                     "open_defect_count", "created_at"}
         assert required.issubset(resp.get_json().keys())
 
-    def test_defect_response_has_all_required_fields(self, client, admin_headers, defect):
-        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=admin_headers)
+    def test_defect_response_has_all_required_fields(self, client, api_headers, defect):
+        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=api_headers)
         required = {
             "id", "device_id", "device_name", "category", "description",
             "event_name", "project_number", "status", "reporter",
@@ -137,48 +137,48 @@ class TestAPIResponseContract:
         }
         assert required.issubset(resp.get_json().keys())
 
-    def test_defect_list_has_pagination_envelope(self, client, admin_headers):
-        resp = client.get("/api/v1/defects", headers=admin_headers)
+    def test_defect_list_has_pagination_envelope(self, client, api_headers):
+        resp = client.get("/api/v1/defects", headers=api_headers)
         data = resp.get_json()
         for key in ("items", "total", "page", "per_page", "pages"):
             assert key in data, f"Pagination key '{key}' missing"
 
-    def test_per_page_capped_at_200(self, client, admin_headers):
-        resp = client.get("/api/v1/defects?per_page=9999", headers=admin_headers)
+    def test_per_page_capped_at_200(self, client, api_headers):
+        resp = client.get("/api/v1/defects?per_page=9999", headers=api_headers)
         assert resp.status_code == 200
         assert resp.get_json()["per_page"] <= 200
 
-    def test_default_page_is_1(self, client, admin_headers):
-        resp = client.get("/api/v1/defects", headers=admin_headers)
+    def test_default_page_is_1(self, client, api_headers):
+        resp = client.get("/api/v1/defects", headers=api_headers)
         assert resp.get_json()["page"] == 1
 
-    def test_created_at_is_iso8601(self, client, admin_headers, defect):
-        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=admin_headers)
+    def test_created_at_is_iso8601(self, client, api_headers, defect):
+        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=api_headers)
         ts = resp.get_json()["created_at"]
         # Must parse without raising
         parsed = datetime.fromisoformat(ts)
         assert parsed is not None
 
-    def test_resolved_at_is_null_when_open(self, client, admin_headers, defect):
-        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=admin_headers)
+    def test_resolved_at_is_null_when_open(self, client, api_headers, defect):
+        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=api_headers)
         assert resp.get_json()["resolved_at"] is None
 
-    def test_resolved_at_is_set_after_resolution(self, client, admin_headers, defect):
+    def test_resolved_at_is_set_after_resolution(self, client, api_headers, defect):
         client.patch(
             f"/api/v1/defects/{defect['id']}/resolve",
             json={"resolution_notes": "fixed"},
-            headers=admin_headers,
+            headers=api_headers,
         )
-        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=admin_headers)
+        resp = client.get(f"/api/v1/defects/{defect['id']}", headers=api_headers)
         ts = resp.get_json()["resolved_at"]
         assert ts is not None
         datetime.fromisoformat(ts)  # must be valid ISO 8601
 
-    def test_validation_error_includes_fields_map(self, client, admin_headers, device):
+    def test_validation_error_includes_fields_map(self, client, api_headers, device):
         resp = client.post(
             "/api/v1/defects",
             json={"device_id": device["device_id"]},   # missing required fields
-            headers=admin_headers,
+            headers=api_headers,
         )
         assert resp.status_code == 400
         data = resp.get_json()
@@ -194,16 +194,16 @@ class TestAPIResponseContract:
 class TestCascadeDelete:
     """Deleting a device must automatically delete all its defect records."""
 
-    def test_single_defect_deleted_with_device(self, app, client, admin_headers, defect):
+    def test_single_defect_deleted_with_device(self, app, client, api_headers, defect):
         defect_id = defect["id"]
         resp = client.delete(
-            f"/api/v1/devices/{defect['device_id']}", headers=admin_headers
+            f"/api/v1/devices/{defect['device_id']}", headers=api_headers
         )
         assert resp.status_code == 204
         with app.app_context():
             assert db.session.get(Defect, defect_id) is None
 
-    def test_multiple_defects_deleted_with_device(self, app, client, admin_headers, device):
+    def test_multiple_defects_deleted_with_device(self, app, client, api_headers, device):
         with app.app_context():
             dev = Device.query.filter_by(device_id=device["device_id"]).first()
             ids = []
@@ -221,7 +221,7 @@ class TestCascadeDelete:
             ids = [d.id for d in dev.defects]
 
         resp = client.delete(
-            f"/api/v1/devices/{device['device_id']}", headers=admin_headers
+            f"/api/v1/devices/{device['device_id']}", headers=api_headers
         )
         assert resp.status_code == 204
 
@@ -229,8 +229,8 @@ class TestCascadeDelete:
             for did in ids:
                 assert db.session.get(Defect, did) is None
 
-    def test_device_gone_after_delete(self, app, client, admin_headers, device):
-        client.delete(f"/api/v1/devices/{device['device_id']}", headers=admin_headers)
+    def test_device_gone_after_delete(self, app, client, api_headers, device):
+        client.delete(f"/api/v1/devices/{device['device_id']}", headers=api_headers)
         with app.app_context():
             assert Device.query.filter_by(device_id=device["device_id"]).first() is None
 

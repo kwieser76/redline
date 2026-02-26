@@ -6,7 +6,7 @@ the UI and FileMaker integration:
   Device.status          : "Verfügbar" | "Wartung" | "Reserviert"
   Defect.status          : "Offen"     | "Behoben"
   Defect.werkstatt_status: "Ausstehend" | "In Prüfung" | "In Reparatur" | "Repariert"
-  User roles             : is_admin=True | is_disponent=True | is_werkstatt=True | (none → community)
+  User roles             : is_admin | is_disponent | is_werkstatt | is_api_user | (none → community)
 """
 
 from datetime import datetime, timezone
@@ -28,6 +28,7 @@ class User(UserMixin, db.Model):
     is_disponent = db.Column(db.Boolean, default=False, nullable=False)
     is_werkstatt = db.Column(db.Boolean, default=False, nullable=False)
     is_community = db.Column(db.Boolean, default=False, nullable=False)
+    is_api_user = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -41,6 +42,8 @@ class User(UserMixin, db.Model):
             return "disponent"
         if self.is_werkstatt:
             return "werkstatt"
+        if self.is_api_user:
+            return "api"
         return "community"
 
     def set_password(self, password: str) -> None:
