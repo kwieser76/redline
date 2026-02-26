@@ -1,15 +1,14 @@
 # ---------------------------------------------------------------------------
 # Redline – Docker Compose deployment
 #
-# Services:
-#   redline    – Flask application (gunicorn)
-#   prometheus – Metrics collection & storage
-#   grafana    – Observability dashboard (auto-provisioned)
+# ⚡ Hostinger HPanel deployment
+#   1. Push code to GitHub – GitHub Actions builds & pushes the image to GHCR.
+#   2. In HPanel → Docker Manager: enter GitHub URL + this file.
+#   3. Create/upload .env via HPanel File Manager (see .env.example).
+#   4. Deploy.
 #
-# Usage:
-#   cp .env.example .env          # fill in all required values
-#   docker compose up -d
-#   docker compose logs -f
+# 💻 Local / SSH deployment (with local build)
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 #
 # Grafana: http://localhost:3000  (admin / see GRAFANA_ADMIN_PASSWORD in .env)
 # Metrics: http://localhost:8000/metrics
@@ -20,11 +19,9 @@ services:
 
   # ── Flask Application ─────────────────────────────────────────────────────
   redline:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-    image: redline:latest
+    # Image is built automatically by GitHub Actions and pushed to GHCR.
+    # For local builds use docker-compose.build.yml overlay instead.
+    image: ghcr.io/kwieser76/redline-:latest
     container_name: redline_app
     restart: unless-stopped
 
@@ -62,8 +59,10 @@ services:
     container_name: redline_prometheus
     restart: unless-stopped
 
+    # Bound to localhost only – not publicly reachable.
+    # Remove the "127.0.0.1:" prefix if you need external access (secure with firewall!).
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
 
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -93,12 +92,15 @@ services:
     container_name: redline_grafana
     restart: unless-stopped
 
+    # Bound to localhost only – not publicly reachable.
+    # Remove the "127.0.0.1:" prefix if you need external access (secure with firewall!).
     ports:
-      - "${GRAFANA_PORT:-3000}:3000"
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
 
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-redline-grafana}"
+      # No fallback – GRAFANA_ADMIN_PASSWORD must be set in .env
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD}"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
