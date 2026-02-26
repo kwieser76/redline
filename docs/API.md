@@ -2,8 +2,8 @@
 
 **Base URL:** `{APP_BASE_URL}/api/v1`
 **Format:** `application/json`
-**Authentication:** HTTP Basic Auth
-**Version:** 1.0.0
+**Authentication:** HTTP Basic Auth (dedicated `api_user` account required)
+**Version:** 0.1b
 **Interactive Docs:** `{APP_BASE_URL}/api/docs` (Swagger UI)
 
 ---
@@ -23,19 +23,30 @@
 
 ## 1. Authentication
 
-All endpoints require **HTTP Basic Auth** with the same credentials as the web UI.
+All endpoints require **HTTP Basic Auth** with a dedicated **`api_user`** account.
 
 ```
 Authorization: Basic <base64(username:password)>
 ```
 
-| User | Role | Permissions |
+> **Important:** Web-UI accounts (`admin`, `disponent`, `werkstatt`, `team_login`) are
+> **not permitted** to use the API. They will receive `403 Forbidden`.
+> Only accounts with `is_api_user=True` may authenticate.
+
+| User | Type | Permissions |
 |------|------|-------------|
-| `admin` | Administrator | Full read + write + delete |
-| `team_login` | Community user | Read + report defects |
+| `api` | api_user | Full access to all endpoints |
+
+**Default credentials** (change before going live!):
+
+```bash
+# List all devices
+curl -u api:api2025 https://srv/api/v1/devices
+```
 
 > **Production note:** Always use HTTPS. Basic Auth credentials are only
 > Base64-encoded, not encrypted at the transport level.
+> Manage API users via **Admin → Benutzerverwaltung** → "API-Zugriff" checkbox.
 
 Unauthenticated requests receive:
 
@@ -45,6 +56,15 @@ WWW-Authenticate: Basic realm="Redline API"
 Content-Type: application/json
 
 {"error": "Authentication required."}
+```
+
+Web-UI accounts receive:
+
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/json
+
+{"error": "API access requires a dedicated api_user account. Web-UI accounts (admin, disponent, werkstatt) cannot authenticate to the API."}
 ```
 
 ---
@@ -58,7 +78,7 @@ Content-Type: application/json
 | `204` | No Content | Successful DELETE (empty body) |
 | `400` | Bad Request | Missing / invalid fields |
 | `401` | Unauthorized | Missing or wrong credentials |
-| `403` | Forbidden | Non-admin on admin-only endpoint |
+| `403` | Forbidden | Non-api_user account used; or non-admin on admin-only endpoint |
 | `404` | Not Found | Unknown `device_id`, `defect_id`, etc. |
 | `409` | Conflict | Duplicate `device_id`; defect already resolved |
 | `429` | Too Many Requests | Rate limit exceeded |
@@ -407,19 +427,22 @@ Return all defects for a project number.
 ## 8. curl Examples
 
 ```bash
+# All examples use the dedicated api_user account (api:api2025).
+# Replace "api2025" with your production password.
+
 # List all devices
-curl -u admin:admin123 https://srv/api/v1/devices
+curl -u api:api2025 https://srv/api/v1/devices
 
 # List devices in maintenance
-curl -u admin:admin123 "https://srv/api/v1/devices?status=Wartung"
+curl -u api:api2025 "https://srv/api/v1/devices?status=Wartung"
 
-# Create a device (admin)
-curl -u admin:admin123 -X POST https://srv/api/v1/devices \
+# Create a device
+curl -u api:api2025 -X POST https://srv/api/v1/devices \
   -H "Content-Type: application/json" \
   -d '{"device_id":"CAM-001","name":"Kamera Sony A7 IV"}'
 
-# Report a defect (team user)
-curl -u team_login:team2025 -X POST https://srv/api/v1/defects \
+# Report a defect
+curl -u api:api2025 -X POST https://srv/api/v1/defects \
   -H "Content-Type: application/json" \
   -d '{
     "device_id":"CAM-001",
@@ -430,17 +453,17 @@ curl -u team_login:team2025 -X POST https://srv/api/v1/defects \
   }'
 
 # List open defects for an event
-curl -u admin:admin123 \
+curl -u api:api2025 \
   "https://srv/api/v1/defects?status=Offen&project_number=PRJ-2025-042"
 
-# Resolve defect (admin)
-curl -u admin:admin123 -X PATCH https://srv/api/v1/defects/42/resolve \
+# Resolve defect
+curl -u api:api2025 -X PATCH https://srv/api/v1/defects/42/resolve \
   -H "Content-Type: application/json" \
   -d '{"resolution_notes":"Griff ersetzt, getestet."}'
 
 # Download QR code PNG
-curl -u admin:admin123 https://srv/api/v1/devices/CAM-001/qr -o qr_CAM-001.png
+curl -u api:api2025 https://srv/api/v1/devices/CAM-001/qr -o qr_CAM-001.png
 
 # Full event summary
-curl -u admin:admin123 https://srv/api/v1/events/PRJ-2025-042
+curl -u api:api2025 https://srv/api/v1/events/PRJ-2025-042
 ```

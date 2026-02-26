@@ -6,26 +6,32 @@ info:
     REST JSON API für das QR-Code-basierte Defektmeldesystem von Redline Enterprise.
 
     ## Authentifizierung
-    Alle Endpunkte verwenden **HTTP Basic Auth** mit denselben Zugangsdaten wie die Web-Oberfläche.
+    Alle Endpunkte verwenden **HTTP Basic Auth** mit einem dedizierten **api_user**-Account.
 
-    | Benutzer      | Rolle       | Bemerkung                        |
-    |---------------|-------------|----------------------------------|
-    | `admin`       | Admin       | Vollzugriff                      |
-    | `team_login`  | Standard    | Defekte melden, Daten lesen      |
+    > **Wichtig:** Web-UI-Accounts (`admin`, `disponent`, `werkstatt`, `team_login`) erhalten
+    > auf allen API-Endpunkten **403 Forbidden**. Nur Accounts mit `is_api_user=True` sind zugelassen.
+
+    | Benutzer | Typ      | Bemerkung                              |
+    |----------|----------|----------------------------------------|
+    | `api`    | api_user | Vollzugriff auf alle Endpunkte         |
+
+    Standard-Zugangsdaten (vor Produktiveinsatz ändern!): `api` / `api2025`
+
+    API-User anlegen: **Admin → Benutzerverwaltung → „API-Zugriff"-Checkbox**
 
     ## Statuscodes
-    | Code | Bedeutung                   |
-    |------|-----------------------------|
-    | 200  | OK                          |
-    | 201  | Erstellt                    |
-    | 204  | Gelöscht (kein Body)        |
-    | 400  | Validierungsfehler          |
-    | 401  | Nicht authentifiziert       |
-    | 403  | Keine Berechtigung (Admin)  |
-    | 404  | Nicht gefunden              |
-    | 409  | Konflikt (z.B. ID vergeben) |
+    | Code | Bedeutung                                             |
+    |------|-------------------------------------------------------|
+    | 200  | OK                                                    |
+    | 201  | Erstellt                                              |
+    | 204  | Gelöscht (kein Body)                                  |
+    | 400  | Validierungsfehler                                    |
+    | 401  | Nicht authentifiziert                                 |
+    | 403  | Kein api_user-Account / kein Admin auf Admin-Endpunkt |
+    | 404  | Nicht gefunden                                        |
+    | 409  | Konflikt (z.B. ID vergeben)                           |
 
-  version: "1.0.0"
+  version: "0.1b"
   contact:
     name: Redline Enterprise
     email: admin@redline.local

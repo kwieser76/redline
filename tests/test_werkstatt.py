@@ -306,6 +306,24 @@ class TestWerkstattComments:
             assert c.username == "werkstatt"
             assert c.user_role == "werkstatt"
 
+    def test_comment_has_created_at_timestamp(self, werkstatt_client, open_defect, app):
+        """Every comment must be stored with a non-null created_at timestamp."""
+        from datetime import datetime, timezone
+        before = datetime.now(timezone.utc)
+        werkstatt_client.post(
+            f"/werkstatt/defekt/{open_defect['id']}/kommentar",
+            data={"text": "Zeitstempel-Check."},
+            follow_redirects=True,
+        )
+        with app.app_context():
+            c = Comment.query.filter_by(
+                defect_id=open_defect["id"], text="Zeitstempel-Check."
+            ).first()
+            assert c is not None
+            assert c.created_at is not None, "Comment.created_at must not be None"
+            # created_at must be a datetime (stored as UTC-naive or aware)
+            assert isinstance(c.created_at, datetime)
+
     def test_empty_comment_rejected(self, werkstatt_client, open_defect):
         resp = werkstatt_client.post(
             f"/werkstatt/defekt/{open_defect['id']}/kommentar",
