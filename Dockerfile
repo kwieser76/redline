@@ -33,10 +33,13 @@ RUN pip install --no-cache-dir --upgrade pip \
 # ---- Stage 2: runtime image ----
 FROM python:3.11-slim AS runtime
 
-# Security: run as a non-root user with explicit UID/GID 1001.
-# The fixed UID makes Docker named-volume ownership predictable:
-# the host chown command can always use 1001:1001.
-RUN groupadd -r -g 1001 redline \
+# Security: non-root user with fixed UID/GID 1001.
+# Fixed UID makes Docker named-volume ownership predictable.
+# gosu is used by docker-entrypoint.sh to drop from root → redline after
+# fixing volume ownership (see docker-entrypoint.sh for the rationale).
+RUN apt-get update && apt-get install -y --no-install-recommends gosu \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd -r -g 1001 redline \
  && useradd -r -u 1001 -g 1001 -d /app -s /sbin/nologin redline
 
 WORKDIR /app
@@ -48,10 +51,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy application source
 COPY --chown=redline:redline . .
 
+# Copy entrypoint and make it executable (owned by root – intentional)
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create data directories and set ownership BEFORE the VOLUME declaration.
 # Docker initialises a named volume from the container directory the first time
-# it is mounted.  Without this the directories are root-owned and the app user
-# (redline) cannot write the SQLite database → restart-loop on first deploy.
+# it is mounted.  docker-entrypoint.sh re-applies chown on every start so that
+# pre-existing volumes with wrong ownership are fixed automatically.
 RUN mkdir -p /app/data /app/static/qrcodes \
  && chown -R redline:redline /app/data /app/static/qrcodes
 
@@ -68,21 +75,22 @@ ENV GUNICORN_THREADS=4
 ENV GUNICORN_TIMEOUT=120
 ENV PORT=8000
 
-# Run as non-root
-USER redline
+# NOTE: no USER directive – docker-entrypoint.sh starts as root, fixes
+# volume ownership, then execs gunicorn as the redline user via gosu.
 
 EXPOSE 8000
 
-# Health-check endpoint – just hits the login redirect
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/')" || exit 1
+# Health-check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/healthz')" || exit 1
 
-CMD gunicorn \
-    --bind "0.0.0.0:${PORT}" \
-    --workers "${GUNICORN_WORKERS}" \
-    --threads "${GUNICORN_THREADS}" \
-    --timeout "${GUNICORN_TIMEOUT}" \
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["sh", "-c", "gunicorn \
+    --bind 0.0.0.0:${PORT} \
+    --workers ${GUNICORN_WORKERS} \
+    --threads ${GUNICORN_THREADS} \
+    --timeout ${GUNICORN_TIMEOUT} \
     --access-logfile - \
     --error-logfile - \
     --log-level info \
-    "app:app"
+    app:app"]
