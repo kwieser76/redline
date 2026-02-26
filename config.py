@@ -91,7 +91,10 @@ class Config:
     #  Rate limiting (flask-limiter)                                       #
     # ------------------------------------------------------------------ #
     RATELIMIT_ENABLED: bool = True
-    RATELIMIT_STORAGE_URL: str = os.environ.get("RATELIMIT_STORAGE_URL", "memory://")
+    # Flask-Limiter 3.x reads RATELIMIT_STORAGE_URI (not _URL).
+    # Defaults to in-memory which is fine for single-instance deployments.
+    # Set RATELIMIT_STORAGE_URI=redis://... in .env to use Redis.
+    RATELIMIT_STORAGE_URI: str = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_DEFAULT: str = "200 per hour;50 per minute"
 
     # ------------------------------------------------------------------ #
