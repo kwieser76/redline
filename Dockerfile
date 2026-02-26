@@ -33,8 +33,11 @@ RUN pip install --no-cache-dir --upgrade pip \
 # ---- Stage 2: runtime image ----
 FROM python:3.11-slim AS runtime
 
-# Security: run as a non-root user
-RUN groupadd -r redline && useradd -r -g redline -d /app -s /sbin/nologin redline
+# Security: run as a non-root user with explicit UID/GID 1001.
+# The fixed UID makes Docker named-volume ownership predictable:
+# the host chown command can always use 1001:1001.
+RUN groupadd -r -g 1001 redline \
+ && useradd -r -u 1001 -g 1001 -d /app -s /sbin/nologin redline
 
 WORKDIR /app
 
@@ -44,6 +47,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source
 COPY --chown=redline:redline . .
+
+# Create data directories and set ownership BEFORE the VOLUME declaration.
+# Docker initialises a named volume from the container directory the first time
+# it is mounted.  Without this the directories are root-owned and the app user
+# (redline) cannot write the SQLite database → restart-loop on first deploy.
+RUN mkdir -p /app/data /app/static/qrcodes \
+ && chown -R redline:redline /app/data /app/static/qrcodes
 
 # Persistent storage for SQLite DB and generated QR images
 VOLUME ["/app/data", "/app/static/qrcodes"]
