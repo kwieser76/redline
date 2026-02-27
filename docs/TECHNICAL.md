@@ -82,22 +82,13 @@ Redline-/
 ├── docker-compose.yml      # Docker Compose: redline + prometheus + grafana
 ├── .env.example            # Environment variable template
 │
-├── prometheus/
-│   └── prometheus.yml      # Prometheus scrape config (15s interval, 30d retention)
-│
-├── grafana/
-│   ├── provisioning/
-│   │   ├── datasources/prometheus.yml   # Auto-wired Prometheus datasource
-│   │   └── dashboards/dashboard.yml     # Dashboard folder provider config
-│   └── dashboards/
-│       └── redline.json    # Operations dashboard (4 rows, 16 panels)
-│
 ├── routes/                 # Web UI blueprints
 │   ├── __init__.py
 │   ├── auth.py             # /auth/login, /auth/logout
 │   ├── report.py           # /report/<device_id>
 │   ├── admin.py            # /admin/* (all admin routes + admin_required)
-│   └── disponent.py        # /disponent/* (dispatcher UI + disponent_required)
+│   ├── disponent.py        # /disponent/* (dispatcher UI + disponent_required)
+│   └── werkstatt.py        # /werkstatt/* (workshop UI + werkstatt_required)
 │
 ├── static/
 │   ├── css/style.css       # Redline brand CSS (black/red, Barlow Condensed)
@@ -114,7 +105,8 @@ Redline-/
 │   ├── error.html          # Generic error page (403, 404, 429)
 │   ├── api_docs.html       # Swagger UI wrapper
 │   ├── admin/              # Admin dashboard templates (9 files)
-│   └── disponent/          # Dispatcher UI templates (4 files)
+│   ├── disponent/          # Dispatcher UI templates (5 files)
+│   └── werkstatt/          # Workshop UI templates (3 files)
 │
 ├── tests/
 │   ├── conftest.py         # Session fixtures, TestConfig, clean_db, disponent_client
@@ -158,6 +150,7 @@ create_app(config_class)
     ├── register_blueprint(report_bp)
     ├── register_blueprint(admin_bp)
     ├── register_blueprint(disponent_bp)
+    ├── register_blueprint(werkstatt_bp)
     ├── register_blueprint(api_bp)
     ├── standalone routes (/, /api/docs)
     ├── error handlers (403, 404, 429)
@@ -202,9 +195,11 @@ users
   password_hash     VARCHAR(255)          NOT NULL
   is_admin          BOOLEAN       DEFAULT FALSE          ← role: admin
   is_disponent      BOOLEAN       DEFAULT FALSE          ← role: disponent
+  is_werkstatt      BOOLEAN       DEFAULT FALSE          ← role: werkstatt
   is_community      BOOLEAN       DEFAULT FALSE          ← role: community
+  is_api_user       BOOLEAN       DEFAULT FALSE          ← role: api_user
   created_at        DATETIME      DEFAULT UTC NOW
-  [role]            property      "admin"|"disponent"|"community"  (not stored)
+  [role]            property      "admin"|"disponent"|"werkstatt"|"community"|"api_user"  (not stored)
 
 devices
   id           PK  INTEGER
@@ -249,7 +244,7 @@ defect_categories
 |-------|-------|--------|
 | `Device` | `status` | `Verfügbar` · `Wartung` · `Reserviert` |
 | `Defect` | `status` | `Offen` · `Behoben` |
-| `User` | `role` *(property)* | `admin` · `disponent` · `community` |
+| `User` | `role` *(property)* | `admin` · `disponent` · `werkstatt` · `community` · `api_user` |
 
 ### Cascade Delete
 
@@ -350,15 +345,19 @@ The factory calls `validate()` before the first request. `ProductionConfig` hard
 | Any authenticated | `@login_required` | Report form, basic views |
 | Admin | `@admin_required` | All `/admin/*` routes |
 | Disponent | `@disponent_required` | All `/disponent/*` routes (admins also allowed) |
+| Werkstatt | `@werkstatt_required` | All `/werkstatt/*` routes (admins also allowed) |
+| Community (API) | `@_require_auth()` | Read-only API endpoints |
 | Admin (API) | `@_require_auth(admin_only=True)` | Write/delete API endpoints |
 
 **Role flags** (mutually exclusive in practice, `is_admin` takes precedence in `role` property):
 
-| `is_admin` | `is_disponent` | `User.role` | Login redirect |
-|-----------|---------------|-------------|----------------|
-| `True` | any | `"admin"` | `/admin/` |
-| `False` | `True` | `"disponent"` | `/disponent/` |
-| `False` | `False` | `"community"` | `/admin/all_defects` |
+| `is_admin` | `is_disponent` | `is_werkstatt` | `is_api_user` | `User.role` | Login redirect |
+|-----------|---------------|----------------|--------------|-------------|----------------|
+| `True` | any | any | any | `"admin"` | `/admin/` |
+| `False` | `True` | any | any | `"disponent"` | `/disponent/` |
+| `False` | `False` | `True` | any | `"werkstatt"` | `/werkstatt/` |
+| `False` | `False` | `False` | `True` | `"api_user"` | `/` |
+| `False` | `False` | `False` | `False` | `"community"` | `/report/` |
 
 ### Password Storage
 
@@ -396,7 +395,8 @@ See [Section 11](#11-rate-limiting).
 | `auth_bp` | `/auth` | `GET/POST /login`, `GET /logout` |
 | `report_bp` | `/report` | `GET/POST /<device_id>`, `GET /<device_id>/success` |
 | `admin_bp` | `/admin` | Dashboard, devices, QR, history, repair, users, defects, event-report, recipients, categories, availability |
-| `disponent_bp` | `/disponent` | Dashboard, tile-detail, devices (read-only), availability, CSV export |
+| `disponent_bp` | `/disponent` | Dashboard, tile-detail, devices, availability, CSV export, device status |
+| `werkstatt_bp` | `/werkstatt` | Dashboard, device list, event summary report |
 
 **Disponent routes detail:**
 
@@ -404,9 +404,18 @@ See [Section 11](#11-rate-limiting).
 |-------|------|---------|
 | `GET /disponent/` | `@disponent_required` | Dashboard with 4 stat tiles |
 | `GET /disponent/kachel/<key>` | `@disponent_required` | Filtered device list (`alle` / `verfuegbar` / `nicht-verfuegbar` / `reserviert`) |
-| `GET /disponent/geraete` | `@disponent_required` | Read-only device overview |
+| `GET /disponent/geraete` | `@disponent_required` | Device overview with reserve/release actions |
 | `GET /disponent/verfuegbarkeit` | `@disponent_required` | Date-range availability report |
 | `GET /disponent/verfuegbarkeit/export` | `@disponent_required` | CSV export of availability report |
+| `POST /disponent/geraet/<id>/status` | `@disponent_required` | Set device status to `Verfügbar` or `Reserviert` |
+
+**Werkstatt routes detail:**
+
+| Route | Auth | Purpose |
+|-------|------|---------|
+| `GET /werkstatt/` | `@werkstatt_required` | Workshop dashboard |
+| `GET /werkstatt/geraete` | `@werkstatt_required` | Device list (read-only) |
+| `GET/POST /werkstatt/bericht` | `@werkstatt_required` | Send event summary report by e-mail |
 
 ### REST API
 
@@ -447,11 +456,14 @@ Technician submits form
 
 ### Event Summary Report (SMTP)
 
-Used by admins to send a post-event summary.
+Used by admins and werkstatt users to send a post-event summary.
 
 ```
 Admin fills event-report form (event name, project number, recipient)
   → POST /admin/event-report
+  OR
+Werkstatt user fills event-report form
+  → POST /werkstatt/bericht
   → Defects queried from DB
   → send_event_summary_report(mail, ...) called
   → Flask-Mail sends via configured SMTP server

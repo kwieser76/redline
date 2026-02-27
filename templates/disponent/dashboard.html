@@ -21,11 +21,11 @@
     <div class="stat-hint">→ Liste anzeigen</div>
   </a>
 
-  <a href="{{ url_for('disponent.tile_detail', filter_key='reserviert') }}"
-     class="stat-card stat-card-link" title="Reservierte Geräte anzeigen">
-    <div class="stat-value stat-orange">{{ reserviert }}</div>
-    <div class="stat-label">Reserviert</div>
-    <div class="stat-hint">→ Liste anzeigen</div>
+  <a href="{{ url_for('disponent.availability') }}"
+     class="stat-card stat-card-link" title="Geräteverfügbarkeit anzeigen">
+    <div class="stat-value stat-orange">{{ open_defects }}</div>
+    <div class="stat-label">Offene Defekte</div>
+    <div class="stat-hint">→ Verfügbarkeit</div>
   </a>
 
   <a href="{{ url_for('disponent.tile_detail', filter_key='verfuegbar') }}"

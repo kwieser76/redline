@@ -27,8 +27,20 @@
         <td style="padding:10px 12px;">Klick bringt Sie jederzeit zurück zur Startseite (Admin-Dashboard).</td>
       </tr>
       <tr style="border-bottom:1px solid var(--gray-100);">
-        <td style="padding:10px 12px;"><strong>Admin</strong></td>
+        <td style="padding:10px 12px;"><strong>Admin</strong> <span style="color:var(--gray-500);font-size:12px;">(nur Admins)</span></td>
         <td style="padding:10px 12px;">Link zum Admin-Dashboard – Übersicht aller Verwaltungsbereiche.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Disponent</strong> <span style="color:var(--gray-500);font-size:12px;">(nur Disponenten)</span></td>
+        <td style="padding:10px 12px;">Link zum Disponent-Dashboard – Geräteverfügbarkeit und Reservierungen.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Werkstatt</strong> <span style="color:var(--gray-500);font-size:12px;">(nur Werkstatt)</span></td>
+        <td style="padding:10px 12px;">Link zum Werkstatt-Dashboard – Gerätestatus und Ereignisberichte.</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Bericht</strong> <span style="color:var(--gray-500);font-size:12px;">(nur Werkstatt)</span></td>
+        <td style="padding:10px 12px;">Ereignisbericht per E-Mail versenden (Werkstatt-Benutzer).</td>
       </tr>
       <tr style="border-bottom:1px solid var(--gray-100);">
         <td style="padding:10px 12px;"><strong>API</strong></td>
@@ -61,7 +73,7 @@
     <li><strong>E-Mail abschicken</strong> – Techniker tippt auf "Senden" im E-Mail-Client – die Werkstatt erhält die Meldung sofort.</li>
     <li><strong>Werkstatt repariert</strong> – Das defekte Gerät wird instand gesetzt.</li>
     <li><strong>Defekt als behoben markieren</strong> – Admin öffnet die Defekthistorie des Geräts und klickt auf "Als behoben markieren". Der Gerätestatus wechselt zurück auf <em>Verfügbar</em>.</li>
-    <li><strong>Ereignisbericht</strong> – Nach einem Event kann der Admin unter <em>Ereignisbericht senden</em> eine Zusammenfassung aller Defekte per E-Mail verschicken.</li>
+    <li><strong>Ereignisbericht</strong> – Nach einem Event kann der Admin (unter <em>Ereignisbericht senden</em>) oder ein Werkstatt-Benutzer (unter <em>Bericht</em>) eine Zusammenfassung aller Defekte per E-Mail verschicken.</li>
   </ol>
 </div>
 
@@ -130,13 +142,28 @@
     <tbody>
       <tr style="border-bottom:1px solid var(--gray-100);">
         <td style="padding:10px 12px;"><strong>Administrator</strong></td>
-        <td style="padding:10px 12px;">Vollzugriff auf alle Admin-Bereiche und die API.</td>
+        <td style="padding:10px 12px;">Vollzugriff auf alle Admin-Bereiche und die API. Verwaltet Geräte, Defekte, Benutzer und Konfiguration.</td>
         <td style="padding:10px 12px;">PC / Laptop</td>
       </tr>
-      <tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Disponent</strong></td>
+        <td style="padding:10px 12px;">Zugriff auf das Disponent-Dashboard: Geräteverfügbarkeit einsehen, Geräte reservieren/freigeben, Verfügbarkeitsbericht als CSV exportieren.</td>
+        <td style="padding:10px 12px;">PC / Laptop / Tablet</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:10px 12px;"><strong>Werkstatt</strong></td>
+        <td style="padding:10px 12px;">Zugriff auf das Werkstatt-Dashboard: Geräteliste einsehen und Ereignisberichte per E-Mail versenden.</td>
+        <td style="padding:10px 12px;">PC / Laptop / Tablet</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--gray-100);">
         <td style="padding:10px 12px;"><strong>Gemeinschaftsuser</strong> <span style="color:var(--gray-500);font-size:12px;">(team_login)</span></td>
         <td style="padding:10px 12px;">Zugriff nur auf das Defektmeldeformular (via QR-Code-Link). Kein Admin-Bereich.</td>
         <td style="padding:10px 12px;">Smartphone / iPhone</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;"><strong>API-Benutzer</strong></td>
+        <td style="padding:10px 12px;">Zugriff nur auf die REST-API (HTTP Basic Auth). Kein Zugriff auf die Web-Oberfläche.</td>
+        <td style="padding:10px 12px;">Externes System / Script</td>
       </tr>
     </tbody>
   </table>
@@ -208,6 +235,11 @@
     </ul>
     <p style="font-size:13px;color:var(--gray-600);margin:0 0 16px 0;">
       Falls das Problem bestehen bleibt, finden Sie Details im Server-Log (<code>gunicorn.log</code> bzw. die Terminal-Ausgabe).
+    </p>
+
+    <p style="font-weight:700;margin-bottom:4px;">Was bedeutet der Gerätestatus "Reserviert"?</p>
+    <p style="font-size:14px;color:var(--gray-700);margin:0 0 16px 0;">
+      Ein Gerät mit Status <em>Reserviert</em> wurde manuell von einem Disponenten für ein Event vorgemerkt und steht somit nicht für andere Zwecke zur Verfügung. Der Status kann jederzeit von einem Disponenten oder Admin wieder auf <em>Verfügbar</em> gesetzt werden (Schaltfläche „Freigeben" in der Geräteübersicht). Geräte in Wartung können nicht gleichzeitig reserviert werden – die Reservierung ist nur für funktionsfähige Geräte möglich.
     </p>
 
     <p style="font-weight:700;margin-bottom:4px;">Was bedeutet der Gerätestatus "Wartung"?</p>

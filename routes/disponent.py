@@ -109,9 +109,11 @@ def _availability_query(
 def dashboard():
     """Main dashboard with four clickable stat tiles."""
     total = Device.query.count()
-    nicht_verfuegbar = Device.query.filter_by(status="Wartung").count()
-    reserviert = Device.query.filter_by(status="Reserviert").count()
+    nicht_verfuegbar = Device.query.filter(
+        Device.status.in_(["Wartung", "Reserviert"])
+    ).count()
     verfuegbar = Device.query.filter_by(status="Verfügbar").count()
+    open_defects = Defect.query.filter_by(status="Offen").count()
 
     # Devices currently unavailable – shown in the quick table below tiles
     unavailable_devices = (
@@ -124,8 +126,8 @@ def dashboard():
         "disponent/dashboard.html",
         total=total,
         nicht_verfuegbar=nicht_verfuegbar,
-        reserviert=reserviert,
         verfuegbar=verfuegbar,
+        open_defects=open_defects,
         unavailable_devices=unavailable_devices,
     )
 
@@ -266,12 +268,12 @@ def availability_export():
     )
 
 
-# Tile filter keys → (page title, device status filter or None for all)
-_TILE_MAP: dict[str, tuple[str, str | None]] = {
+# Tile filter keys → (page title, list of device statuses or None for all)
+_TILE_MAP: dict[str, tuple[str, list[str] | None]] = {
     "alle": ("Alle Geräte", None),
-    "nicht-verfuegbar": ("Nicht verfügbare Geräte", "Wartung"),
-    "reserviert": ("Reservierte Geräte", "Reserviert"),
-    "verfuegbar": ("Verfügbare Geräte", "Verfügbar"),
+    "nicht-verfuegbar": ("Nicht verfügbare Geräte", ["Wartung", "Reserviert"]),
+    "reserviert": ("Reservierte Geräte", ["Reserviert"]),
+    "verfuegbar": ("Verfügbare Geräte", ["Verfügbar"]),
 }
 
 
@@ -286,7 +288,9 @@ def tile_detail(filter_key: str):
 
     if status_filter:
         device_list = (
-            Device.query.filter_by(status=status_filter).order_by(Device.name).all()
+            Device.query.filter(Device.status.in_(status_filter))
+            .order_by(Device.name)
+            .all()
         )
     else:
         device_list = Device.query.order_by(Device.name).all()
