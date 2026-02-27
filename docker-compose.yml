@@ -73,7 +73,7 @@ services:
     volumes:
       - prometheus_data:/prometheus
 
-    # Write the config to /tmp at startup, then exec the real binary.
+    # Write config + alert rules to /tmp at startup, then exec the real binary.
     # prom/prometheus is busybox-based so /bin/sh and /tmp are available.
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -85,6 +85,8 @@ services:
           scrape_timeout:      10s
           external_labels:
             monitor: "redline"
+        rule_files:
+          - "/tmp/redline.rules"
         scrape_configs:
           - job_name: "redline"
             static_configs:
@@ -94,6 +96,78 @@ services:
             static_configs:
               - targets: ["localhost:9090"]
         PROMEOF
+
+        cat > /tmp/redline.rules << 'RULESEOF'
+        groups:
+          - name: redline
+            rules:
+
+              # ── Verfügbarkeit ─────────────────────────────────────────
+              - alert: AppDown
+                expr: up{job="redline"} == 0
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "Redline App nicht erreichbar"
+                  description: "Prometheus kann /metrics nicht mehr scrapen – Container wahrscheinlich down."
+
+              - alert: DatabaseDown
+                expr: redline_db_up == 0
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "Datenbank nicht erreichbar"
+                  description: "SQLite DB kann nicht geöffnet werden – /healthz schlägt fehl."
+
+              # ── HTTP-Fehler ───────────────────────────────────────────
+              - alert: HighErrorRate
+                expr: |
+                  rate(flask_http_request_total{status=~"5.."}[5m])
+                  /
+                  rate(flask_http_request_total[5m])
+                  > 0.05
+                for: 2m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Hohe HTTP-5xx-Fehlerrate"
+                  description: "Mehr als 5 % der Anfragen der letzten 5 min geben HTTP 5xx zurück."
+
+              - alert: RateLimitHits
+                expr: rate(flask_http_request_total{status="429"}[5m]) > 0.5
+                for: 5m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Viele Rate-Limit-Treffer (HTTP 429)"
+                  description: "Mehr als 0,5 abgelehnte Anfragen pro Sekunde – möglicher Angriff oder Fehlkonfiguration."
+
+              # ── Performance ───────────────────────────────────────────
+              - alert: SlowRequests
+                expr: |
+                  histogram_quantile(0.95,
+                    rate(flask_http_request_duration_seconds_bucket[5m])
+                  ) > 2
+                for: 5m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Langsame Antwortzeiten (p95 > 2 s)"
+                  description: "95 % der Anfragen dauern länger als 2 Sekunden."
+
+              # ── Business ──────────────────────────────────────────────
+              - alert: ManyOpenDefects
+                expr: redline_defects_total{state="open"} > 50
+                for: 0m
+                labels:
+                  severity: info
+                annotations:
+                  summary: "Viele offene Defekte"
+                  description: "Aktuell mehr als 50 offene Defekte im System."
+        RULESEOF
+
         exec /bin/prometheus \
           --config.file=/tmp/prometheus.yml \
           --storage.tsdb.retention.time=30d \
