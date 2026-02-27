@@ -14,14 +14,20 @@ from flask import (
     Blueprint,
     Response,
     abort,
+    flash,
     redirect,
     render_template,
     request,
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from models import Defect, DefectCategory, Device, DeviceCategory, db
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 disponent_bp = Blueprint("disponent", __name__, url_prefix="/disponent")
 
@@ -127,9 +133,46 @@ def dashboard():
 @disponent_bp.route("/geraete")
 @disponent_required
 def devices():
-    """Read-only device list ordered by name."""
+    """Device list with reserve/release actions."""
     devices = Device.query.order_by(Device.name).all()
     return render_template("disponent/devices.html", devices=devices)
+
+
+@disponent_bp.route("/geraet/<int:device_id>/status", methods=["POST"])
+@disponent_required
+def set_device_status(device_id: int):
+    """Set a device status to 'Verfügbar' or 'Reserviert'.
+
+    Devices in 'Wartung' cannot be changed here – that is handled by the
+    defect-reporting and repair workflow.
+    """
+    device = db.session.get(Device, device_id)
+    if not device:
+        abort(404)
+
+    new_status = request.form.get("status", "").strip()
+    if new_status not in {"Verfügbar", "Reserviert"}:
+        flash("Ungültiger Status.", "danger")
+        return redirect(request.referrer or url_for("disponent.devices"))
+
+    if device.status == "Wartung":
+        flash(
+            f"'{device.name}' befindet sich in Wartung und kann nicht manuell "
+            "umgeschaltet werden.",
+            "warning",
+        )
+        return redirect(request.referrer or url_for("disponent.devices"))
+
+    device.status = new_status
+    try:
+        db.session.commit()
+        flash(f"'{device.name}' wurde auf '{new_status}' gesetzt.", "success")
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("Failed to update device status %d: %s", device_id, exc)
+        flash("Status konnte nicht gespeichert werden.", "danger")
+
+    return redirect(request.referrer or url_for("disponent.devices"))
 
 
 @disponent_bp.route("/verfuegbarkeit")

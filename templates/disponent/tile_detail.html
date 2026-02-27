@@ -60,6 +60,7 @@
           <th>Beschreibung</th>
           <th data-sort="text" style="cursor:pointer;">Status ↕</th>
           <th>Offene Defekte</th>
+          <th>Verfügbarkeit</th>
         </tr>
       </thead>
       <tbody>
@@ -96,6 +97,31 @@
               <span class="badge badge-open">{{ device.open_defect_count }}</span>
             {% else %}
               <span style="color:var(--gray-400);">0</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if device.status == 'Verfügbar' %}
+            <form method="POST"
+                  action="{{ url_for('disponent.set_device_status', device_id=device.id) }}"
+                  style="display:inline;">
+              <input type="hidden" name="status" value="Reserviert" />
+              <button type="submit" class="btn btn-sm btn-outline"
+                      title="Gerät für ein Event reservieren">
+                Reservieren
+              </button>
+            </form>
+            {% elif device.status == 'Reserviert' %}
+            <form method="POST"
+                  action="{{ url_for('disponent.set_device_status', device_id=device.id) }}"
+                  style="display:inline;">
+              <input type="hidden" name="status" value="Verfügbar" />
+              <button type="submit" class="btn btn-sm btn-secondary"
+                      title="Reservierung aufheben">
+                Freigeben
+              </button>
+            </form>
+            {% else %}
+            <span style="color:var(--gray-400);font-size:13px;">–</span>
             {% endif %}
           </td>
         </tr>
