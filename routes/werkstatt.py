@@ -9,10 +9,13 @@ Routes:
   GET  /werkstatt/defekt/<id>   – defect detail with comments
   POST /werkstatt/defekt/<id>/status    – update werkstatt_status
   POST /werkstatt/defekt/<id>/kommentar – add comment (+ optional photo)
+  GET/POST /werkstatt/bericht   – send event summary report by e-mail
 """
 
 import logging
 import os
+import smtplib
+import socket
 import uuid
 from functools import wraps
 
@@ -31,6 +34,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
 
 from models import Comment, Defect, Device, db
+from notifications import send_event_summary_report
 
 logger = logging.getLogger(__name__)
 
@@ -201,3 +205,71 @@ def add_comment(defect_id: int):
         flash("Kommentar konnte nicht gespeichert werden.", "danger")
 
     return redirect(url_for("werkstatt.defekt_detail", defect_id=defect_id))
+
+
+@werkstatt_bp.route("/bericht", methods=["GET", "POST"])
+@werkstatt_required
+def bericht():
+    """Send an event summary report by e-mail."""
+    if request.method == "POST":
+        event_name = request.form.get("event_name", "").strip()
+        project_number = request.form.get("project_number", "").strip()
+        recipient = request.form.get("recipient", "").strip()
+
+        if not event_name or not project_number or not recipient:
+            flash("Alle Felder sind erforderlich.", "danger")
+        else:
+            defects = (
+                Defect.query.filter_by(
+                    event_name=event_name, project_number=project_number
+                )
+                .order_by(Defect.created_at.desc())
+                .all()
+            )
+            mail = current_app.extensions["mail"]
+            try:
+                send_event_summary_report(
+                    mail, event_name, project_number, defects, recipient
+                )
+                flash(
+                    f"Ereignisbericht für '{event_name}' an {recipient} gesendet "
+                    f"({len(defects)} Defekte).",
+                    "success",
+                )
+            except smtplib.SMTPAuthenticationError:
+                flash(
+                    "E-Mail-Versand fehlgeschlagen: Benutzername oder Passwort für den "
+                    "E-Mail-Server ist falsch. Bitte MAIL_USERNAME und MAIL_PASSWORD "
+                    "in der .env-Datei prüfen.",
+                    "danger",
+                )
+            except (smtplib.SMTPConnectError, ConnectionRefusedError, socket.gaierror):
+                flash(
+                    "E-Mail-Versand fehlgeschlagen: Der E-Mail-Server ist nicht "
+                    "erreichbar. Bitte MAIL_SERVER und MAIL_PORT in der .env-Datei "
+                    "prüfen.",
+                    "danger",
+                )
+            except smtplib.SMTPRecipientsRefused:
+                flash(
+                    "E-Mail-Versand fehlgeschlagen: Die Empfänger-Adresse wurde vom "
+                    "E-Mail-Server abgelehnt. Bitte E-Mail-Adresse prüfen.",
+                    "danger",
+                )
+            except smtplib.SMTPException as exc:
+                flash(f"E-Mail-Versand fehlgeschlagen: {exc}", "danger")
+            except Exception as exc:
+                current_app.logger.error("Unexpected error sending event report: %s", exc)
+                flash(
+                    "E-Mail-Versand fehlgeschlagen: Ein unerwarteter Fehler ist "
+                    "aufgetreten. Details stehen im Server-Log.",
+                    "danger",
+                )
+
+    events = (
+        db.session.query(Defect.event_name, Defect.project_number)
+        .distinct()
+        .order_by(Defect.event_name)
+        .all()
+    )
+    return render_template("werkstatt/bericht.html", events=events)
