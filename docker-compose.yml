@@ -37,7 +37,7 @@ services:
 
     environment:
       DATABASE_URL: "sqlite:////app/data/redline.db"
-      FLASK_ENV: "production"
+      FLASK_ENV: "development"
 
     volumes:
       - redline_data:/app/data
@@ -66,9 +66,9 @@ services:
     container_name: redline_prometheus
     restart: unless-stopped
 
-    # Bound to localhost only – not publicly reachable.
+    # Publicly reachable (bind to all interfaces)
     ports:
-      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
 
     volumes:
       - prometheus_data:/prometheus
@@ -197,9 +197,8 @@ services:
     container_name: redline_grafana
     restart: unless-stopped
 
-    # Bound to localhost only – not publicly reachable.
     ports:
-      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+      - "${GRAFANA_PORT:-3000}:3000"
 
     environment:
       GF_SECURITY_ADMIN_USER: admin

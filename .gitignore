@@ -1,6 +1,7 @@
-# Environment
-.env
+# Environment – *.env files are ignored; the root .env is explicitly
+# un-ignored so testing defaults are tracked in git.
 *.env
+!.env
 
 # Python
 __pycache__/
