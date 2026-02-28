@@ -3,15 +3,54 @@ Authentication blueprint – /auth/*
 """
 
 from datetime import datetime, timezone
+from functools import wraps
 from urllib.parse import urlparse
 
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from extensions import limiter
 from models import User
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+
+# --------------------------------------------------------------------------- #
+#  NFR-SEC-002 – Generic RBAC decorator factory                                #
+# --------------------------------------------------------------------------- #
+
+
+def require_role(*roles: str):
+    """Decorator factory that enforces role-based access control (NFR-SEC-002).
+
+    Checks ``current_user.role`` which is one of:
+    ``'admin'``, ``'disponent'``, ``'werkstatt'``, ``'api'``, ``'community'``.
+
+    Usage::
+
+        @require_role('admin')
+        def admin_only_view(): ...
+
+        @require_role('admin', 'disponent')
+        def manager_view(): ...
+
+    The existing ``@admin_required``, ``@disponent_required``,
+    ``@werkstatt_required`` decorators are semantically equivalent to
+    ``@require_role('admin')``, ``@require_role('admin', 'disponent')``,
+    ``@require_role('admin', 'werkstatt')`` respectively.
+    """
+
+    def decorator(f):
+        @wraps(f)
+        @login_required
+        def wrapped(*args, **kwargs):
+            if current_user.role not in roles:
+                abort(403)
+            return f(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 def _is_safe_url(target: str | None) -> bool:

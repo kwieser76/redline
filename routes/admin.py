@@ -30,7 +30,17 @@ from flask_login import current_user, login_required
 from flask_mail import Mail
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from models import Defect, DefectCategory, Device, DeviceCategory, EmailRecipient, User, db
+from models import (
+    AuditLog,
+    Defect,
+    DefectCategory,
+    Device,
+    DeviceCategory,
+    EmailRecipient,
+    User,
+    db,
+    log_audit,
+)
 from notifications import send_event_summary_report
 
 logger = logging.getLogger(__name__)
@@ -134,12 +144,20 @@ def devices():
                     category_id=category_id,
                 )
                 db.session.add(device)
+                log_audit(
+                    "CREATE", "Device", device_id,
+                    new={"device_id": device_id, "name": name, "description": description},
+                )
                 _safe_commit(f"Gerät '{name}' wurde angelegt.")
 
         elif action == "delete":
             dev_id = request.form.get("dev_id", type=int)
             device = db.session.get(Device, dev_id)
             if device:
+                log_audit(
+                    "DELETE", "Device", device.device_id,
+                    old={"device_id": device.device_id, "name": device.name, "status": device.status},
+                )
                 db.session.delete(device)
                 _safe_commit("Gerät gelöscht.")
 
@@ -232,6 +250,11 @@ def mark_repaired(defect_id: int):
         abort(404)
 
     resolution_notes = request.form.get("resolution_notes", "").strip()
+    log_audit(
+        "UPDATE", "Defect", defect.id,
+        old={"status": "Offen"},
+        new={"status": "Behoben", "resolution_notes": resolution_notes},
+    )
     defect.status = "Behoben"
     defect.resolved_at = datetime.now(timezone.utc)
     defect.resolution_notes = resolution_notes
@@ -289,12 +312,20 @@ def users():
                 )
                 user.set_password(password)
                 db.session.add(user)
+                log_audit(
+                    "CREATE", "User", username,
+                    new={"username": username, "role": user.role},
+                )
                 _safe_commit(f"Benutzer '{username}' wurde angelegt.")
 
         elif action == "delete":
             user_id = request.form.get("user_id", type=int)
             user = db.session.get(User, user_id)
             if user and user.username != "admin" and user.id != current_user.id:
+                log_audit(
+                    "DELETE", "User", user.username,
+                    old={"username": user.username, "role": user.role},
+                )
                 db.session.delete(user)
                 _safe_commit("Benutzer gelöscht.")
             else:
@@ -312,6 +343,8 @@ def users():
                     )
                 else:
                     user.set_password(new_password)
+                    log_audit("UPDATE", "User", user.username,
+                              new={"action": "password_changed"})
                     _safe_commit(
                         f"Passwort für '{user.username}' wurde geändert."
                     )
@@ -765,6 +798,42 @@ def admin_kachel(filter_key: str):
         search=search,
         cat_filter=cat_filter,
         device_categories=device_categories,
+    )
+
+
+# --------------------------------------------------------------------------- #
+#  NFR-SEC-003 – Audit log viewer                                               #
+# --------------------------------------------------------------------------- #
+
+
+@admin_bp.route("/audit")
+@admin_required
+def audit_log():
+    """Paginated view of the security audit trail."""
+    page = request.args.get("page", 1, type=int)
+    action_filter = request.args.get("action", "").strip()
+    entity_filter = request.args.get("entity", "").strip()
+
+    query = AuditLog.query.order_by(AuditLog.timestamp.desc())
+    if action_filter:
+        query = query.filter_by(action=action_filter)
+    if entity_filter:
+        query = query.filter_by(entity_type=entity_filter)
+
+    pagination = query.paginate(page=page, per_page=50, error_out=False)
+
+    # Distinct entity types for the filter dropdown
+    entity_types = [
+        r[0]
+        for r in db.session.query(AuditLog.entity_type).distinct().order_by(AuditLog.entity_type)
+    ]
+
+    return render_template(
+        "admin/audit.html",
+        pagination=pagination,
+        action_filter=action_filter,
+        entity_filter=entity_filter,
+        entity_types=entity_types,
     )
 
 

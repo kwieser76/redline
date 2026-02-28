@@ -706,3 +706,51 @@ class TestGlobalAuthGate:
         resp = client.get("/admin/devices", follow_redirects=False)
         location = resp.headers.get("Location", "")
         assert "next" in location or "login" in location
+
+
+# ---------------------------------------------------------------------------
+# NFR-SEC-005  403 must NOT log out the authenticated user
+# ---------------------------------------------------------------------------
+
+class TestNFRSEC005:
+    """A 403 Forbidden response must preserve the user's session.
+
+    NFR-SEC-005: Receiving a 403 (accessing a resource you're not allowed)
+    must NOT terminate the session. The user remains authenticated and their
+    subsequent requests to permitted resources must still work.
+    """
+
+    def test_403_does_not_log_out_user(self, team_client):
+        """After a 403 the session is intact – next request is also 403, not 302."""
+        resp1 = team_client.get("/admin/")
+        assert resp1.status_code == 403
+        # Second request: if the session had been destroyed we'd get a 302 redirect
+        resp2 = team_client.get("/admin/")
+        assert resp2.status_code == 403, (
+            "Session was destroyed by the 403 response – got redirect instead of 403"
+        )
+
+    def test_session_still_valid_after_403(self, team_client):
+        """After receiving a 403, accessing a permitted route still works."""
+        team_client.get("/admin/")  # triggers 403
+        resp = team_client.get("/report/NONEXISTENT-999", follow_redirects=False)
+        # Permitted for team users – must not redirect to login (302)
+        assert resp.status_code != 302 or "login" not in resp.headers.get("Location", "")
+
+    def test_multiple_403s_do_not_accumulate_logouts(self, team_client):
+        """Repeated 403 responses must not compound into a session termination."""
+        for _ in range(5):
+            resp = team_client.get("/admin/users")
+            assert resp.status_code == 403
+        # Still authenticated – permitted route works
+        resp = team_client.get("/disponent/", follow_redirects=False)
+        # team_login does not have disponent role → 403, not 302-to-login
+        assert resp.status_code == 403
+
+    def test_admin_403_on_nonexistent_does_not_logout(self, admin_client):
+        """An admin accessing a nonexistent route gets 404, not logged out."""
+        resp = admin_client.get("/admin/nonexistent-route-xyz")
+        assert resp.status_code == 404
+        # Still authenticated
+        resp2 = admin_client.get("/admin/")
+        assert resp2.status_code == 200

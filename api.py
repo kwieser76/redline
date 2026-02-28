@@ -33,7 +33,7 @@ import qrcode
 from flask import Blueprint, g, jsonify, request, send_file
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from models import Defect, Device, User, db
+from models import Defect, Device, User, db, log_audit
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +146,8 @@ def create_device():
 
     device = Device(device_id=device_id, name=name, description=description)
     db.session.add(device)
+    log_audit("CREATE", "Device", device_id,
+              new={"device_id": device_id, "name": name, "description": description})
     try:
         db.session.commit()
     except IntegrityError:
@@ -179,6 +181,7 @@ def update_device(device_id: str):
     data = request.get_json(silent=True) or {}
     allowed_statuses = {"Verfügbar", "Wartung", "Reserviert"}
 
+    old_snapshot = {"name": device.name, "description": device.description, "status": device.status}
     if "name" in data:
         device.name = str(data["name"]).strip() or device.name
     if "description" in data:
@@ -190,6 +193,8 @@ def update_device(device_id: str):
             )
         device.status = data["status"]
 
+    log_audit("UPDATE", "Device", device_id, old=old_snapshot,
+              new={"name": device.name, "description": device.description, "status": device.status})
     try:
         db.session.commit()
     except SQLAlchemyError as exc:
@@ -206,6 +211,8 @@ def delete_device(device_id: str):
     device = Device.query.filter_by(device_id=device_id).first()
     if not device:
         return _json_error(f"Device '{device_id}' not found.", 404)
+    log_audit("DELETE", "Device", device_id,
+              old={"device_id": device.device_id, "name": device.name, "status": device.status})
     db.session.delete(device)
     try:
         db.session.commit()
@@ -401,7 +408,11 @@ def resolve_defect(defect_id: int):
         return _json_error("Defect is already resolved.", 409)
 
     data = request.get_json(silent=True) or {}
-    defect.resolution_notes = str(data.get("resolution_notes", "")).strip()
+    resolution_notes = str(data.get("resolution_notes", "")).strip()
+    log_audit("UPDATE", "Defect", defect_id,
+              old={"status": "Offen"},
+              new={"status": "Behoben", "resolution_notes": resolution_notes})
+    defect.resolution_notes = resolution_notes
     defect.status = "Behoben"
     defect.resolved_at = datetime.now(timezone.utc)
 

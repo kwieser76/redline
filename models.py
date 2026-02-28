@@ -9,6 +9,7 @@ the UI and FileMaker integration:
   User roles             : is_admin | is_disponent | is_werkstatt | is_api_user | (none → community)
 """
 
+import json
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
@@ -210,3 +211,110 @@ class Comment(db.Model):
 
     def __repr__(self) -> str:
         return f"<Comment {self.id} defect={self.defect_id} by={self.username}>"
+
+
+# --------------------------------------------------------------------------- #
+#  NFR-SEC-003 – Audit Trail                                                   #
+# --------------------------------------------------------------------------- #
+
+
+class AuditLog(db.Model):
+    """Immutable audit trail for security-relevant CRUD operations.
+
+    Every CREATE / UPDATE / DELETE on core entities (Device, Defect, User,
+    EmailRecipient) is recorded with a snapshot of the before/after values,
+    the acting user, and the client IP address.
+
+    Records are never updated or deleted – they form a tamper-evident log.
+    """
+
+    __tablename__ = "audit_log"
+    __table_args__ = (
+        db.Index("ix_audit_log_timestamp", "timestamp"),
+        db.Index("ix_audit_log_user_id", "user_id"),
+        db.Index("ix_audit_log_entity", "entity_type", "entity_id"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    # Nullable so the row survives if the user account is later deleted.
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # Denormalized for display after user deletion.
+    username = db.Column(db.String(80), nullable=True)
+    # "CREATE" | "UPDATE" | "DELETE"
+    action = db.Column(db.String(20), nullable=False)
+    # Human-readable model name: "Device", "Defect", "User", "EmailRecipient"…
+    entity_type = db.Column(db.String(50), nullable=False)
+    # Natural or primary key of the record (device_id string, defect int, etc.)
+    entity_id = db.Column(db.String(50), nullable=True)
+    # JSON snapshot of the record before the change (UPDATE / DELETE).
+    old_value = db.Column(db.Text, nullable=True)
+    # JSON snapshot of the record after the change (CREATE / UPDATE).
+    new_value = db.Column(db.Text, nullable=True)
+    # IPv4 or IPv6 address of the client.
+    ip_address = db.Column(db.String(45), nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<AuditLog {self.action} {self.entity_type}/{self.entity_id}"
+            f" by={self.username}>"
+        )
+
+
+def log_audit(
+    action: str,
+    entity_type: str,
+    entity_id: str | int | None = None,
+    old: dict | None = None,
+    new: dict | None = None,
+) -> None:
+    """Append an AuditLog entry to the current DB session (caller must commit).
+
+    This function is intentionally a no-op if called outside a request context
+    (e.g. during seeding) so it never breaks startup.
+
+    Parameters
+    ----------
+    action      : ``"CREATE"``, ``"UPDATE"``, or ``"DELETE"``
+    entity_type : model name, e.g. ``"Device"``, ``"Defect"``, ``"User"``
+    entity_id   : natural or primary key of the changed record
+    old         : dict snapshot before the change (UPDATE / DELETE)
+    new         : dict snapshot after the change (CREATE / UPDATE)
+    """
+    try:
+        from flask import g, request as _req
+        from flask_login import current_user as _cu
+
+        # Resolve acting user: web session (Flask-Login) or API (g.api_user).
+        if _cu.is_authenticated:
+            uid = _cu.id
+            uname = _cu.username
+        elif hasattr(g, "api_user") and g.api_user:
+            uid = g.api_user.id
+            uname = g.api_user.username
+        else:
+            uid = None
+            uname = "system"
+
+        entry = AuditLog(
+            user_id=uid,
+            username=uname,
+            action=action,
+            entity_type=entity_type,
+            entity_id=str(entity_id) if entity_id is not None else None,
+            old_value=json.dumps(old, ensure_ascii=False, default=str) if old is not None else None,
+            new_value=json.dumps(new, ensure_ascii=False, default=str) if new is not None else None,
+            ip_address=_req.remote_addr,
+        )
+        db.session.add(entry)
+    except RuntimeError:
+        # Outside request context (seed, tests without request) – skip silently.
+        pass

@@ -13,7 +13,7 @@ import pytest
 
 from app import create_app
 from config import Config, TestConfig
-from models import Comment, db as _db, Defect, DefectCategory, Device, DeviceCategory, EmailRecipient, User
+from models import AuditLog, Comment, db as _db, Defect, DefectCategory, Device, DeviceCategory, EmailRecipient, User
 
 
 # --------------------------------------------------------------------------- #
@@ -39,6 +39,7 @@ def clean_db(app):
         _db.session.rollback()
         # Delete child tables before parents (SQLite doesn't enforce FK cascades
         # during bulk DELETE statements).
+        AuditLog.query.delete()
         Comment.query.delete()
         Defect.query.delete()
         Device.query.delete()

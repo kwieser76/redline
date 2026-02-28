@@ -23,7 +23,7 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 
-from models import Defect, DefectCategory, Device, DeviceCategory, db
+from models import Defect, DefectCategory, Device, DeviceCategory, db, log_audit
 
 import logging
 
@@ -165,7 +165,13 @@ def set_device_status(device_id: int):
         )
         return redirect(request.referrer or url_for("disponent.devices"))
 
+    old_status = device.status
     device.status = new_status
+    log_audit(
+        "UPDATE", "Device", device.device_id,
+        old={"status": old_status},
+        new={"status": new_status},
+    )
     try:
         db.session.commit()
         flash(f"'{device.name}' wurde auf '{new_status}' gesetzt.", "success")

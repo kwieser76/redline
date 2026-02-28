@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Audit-Log{% endblock %}
+
+{% block content %}
+<div class="action-bar">
+  <div class="section-title" style="margin-bottom:0">Audit-Log</div>
+  <div class="spacer"></div>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-secondary">← Dashboard</a>
+</div>
+
+<!-- Filter bar -->
+<form method="GET" action="{{ url_for('admin.audit_log') }}" class="card" style="padding:14px 16px;">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+    <div>
+      <label style="font-size:12px;color:var(--gray-500);display:block;margin-bottom:4px;">Aktion</label>
+      <select name="action" class="form-control" style="min-width:130px;">
+        <option value="">Alle</option>
+        {% for a in ['CREATE','UPDATE','DELETE'] %}
+        <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="font-size:12px;color:var(--gray-500);display:block;margin-bottom:4px;">Entität</label>
+      <select name="entity" class="form-control" style="min-width:140px;">
+        <option value="">Alle</option>
+        {% for e in entity_types %}
+        <option value="{{ e }}" {% if entity_filter == e %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Filtern</button>
+    {% if action_filter or entity_filter %}
+    <a href="{{ url_for('admin.audit_log') }}" class="btn btn-outline">Zurücksetzen</a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Results -->
+<div class="card" style="padding:0;">
+  {% if pagination.items %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Zeitstempel</th>
+          <th>Benutzer</th>
+          <th>Aktion</th>
+          <th>Entität</th>
+          <th>ID</th>
+          <th>Vorher</th>
+          <th>Nachher</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in pagination.items %}
+        <tr>
+          <td style="white-space:nowrap;font-size:13px;color:var(--gray-600);">
+            {{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+          </td>
+          <td>
+            <code style="font-size:12px;">{{ entry.username or '–' }}</code>
+          </td>
+          <td>
+            {% if entry.action == 'CREATE' %}
+              <span class="badge" style="background:var(--green,#16a34a);color:#fff;">CREATE</span>
+            {% elif entry.action == 'DELETE' %}
+              <span class="badge badge-open">DELETE</span>
+            {% elif entry.action == 'UPDATE' %}
+              <span class="badge" style="background:var(--orange,#f59e0b);color:#fff;">UPDATE</span>
+            {% else %}
+              <span class="badge">{{ entry.action }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;">{{ entry.entity_type }}</td>
+          <td><code style="font-size:12px;">{{ entry.entity_id or '–' }}</code></td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="{{ entry.old_value or '' }}">
+            {% if entry.old_value %}
+              <span style="color:var(--gray-600);">{{ entry.old_value }}</span>
+            {% else %}
+              <span style="color:var(--gray-400);">–</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="{{ entry.new_value or '' }}">
+            {% if entry.new_value %}
+              <span style="color:var(--gray-600);">{{ entry.new_value }}</span>
+            {% else %}
+              <span style="color:var(--gray-400);">–</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--gray-500);">{{ entry.ip_address or '–' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination.pages > 1 %}
+  <div style="display:flex;gap:6px;justify-content:center;padding:14px 16px;border-top:1px solid var(--gray-100);">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('admin.audit_log', page=pagination.prev_num, action=action_filter, entity=entity_filter) }}"
+       class="btn btn-sm btn-outline">← Zurück</a>
+    {% endif %}
+    <span style="line-height:32px;font-size:13px;color:var(--gray-500);">
+      Seite {{ pagination.page }} / {{ pagination.pages }}
+      &nbsp;({{ pagination.total }} Einträge)
+    </span>
+    {% if pagination.has_next %}
+    <a href="{{ url_for('admin.audit_log', page=pagination.next_num, action=action_filter, entity=entity_filter) }}"
+       class="btn btn-sm btn-outline">Weiter →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <p style="color:var(--gray-500);margin:16px;">Keine Einträge vorhanden.</p>
+  {% endif %}
+</div>
+{% endblock %}
