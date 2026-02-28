@@ -14,9 +14,13 @@ Covers:
   SEC-08  API admin-only endpoints blocked for team users (comprehensive)
   SEC-09  Empty / whitespace-only form submissions cannot create data
   SEC-10  Sensitive error information not leaked (no stack traces to clients)
+  NFR-SEC-004  Global auth gate – before_request middleware redirects unauthenticated users
+  NFR-SEC-006  Session expiry – time-based re-authentication enforcement
+  NFR-SEC-007  SanitizeFilter – sensitive values must be redacted in logs
 """
 
 import base64
+import logging
 
 
 # ---------------------------------------------------------------------------
@@ -512,3 +516,193 @@ class TestNoInternalErrorLeakage:
         resp = client.get("/api/v1/devices")
         for marker in self.STACK_TRACE_MARKERS:
             assert marker not in resp.data.lower()
+
+
+# ---------------------------------------------------------------------------
+# NFR-SEC-007  SanitizeFilter – sensitive values must be redacted in logs
+# ---------------------------------------------------------------------------
+
+class TestSanitizeFilter:
+    """SanitizeFilter must replace secret values with *** in log records."""
+
+    def _record(self, msg: str) -> logging.LogRecord:
+        return logging.LogRecord(
+            name="test", level=logging.INFO, pathname="", lineno=0,
+            msg=msg, args=(), exc_info=None,
+        )
+
+    def test_password_value_is_redacted(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("password=geheim123")
+        f.filter(record)
+        assert "geheim123" not in record.msg
+        assert "password=***" in record.msg
+
+    def test_passwd_alias_is_redacted(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("passwd=secret")
+        f.filter(record)
+        assert "secret" not in record.msg
+
+    def test_token_value_is_redacted(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("Connecting with token=abc-xyz-123")
+        f.filter(record)
+        assert "abc-xyz-123" not in record.msg
+        assert "token=***" in record.msg
+
+    def test_secret_value_is_redacted(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("secret=myS3cret!")
+        f.filter(record)
+        assert "myS3cret!" not in record.msg
+        assert "secret=***" in record.msg
+
+    def test_key_value_is_redacted(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("key=AKIAIOSFODNN7EXAMPLE")
+        f.filter(record)
+        assert "AKIAIOSFODNN7EXAMPLE" not in record.msg
+
+    def test_non_sensitive_fields_not_changed(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("user=admin status=ok count=5")
+        f.filter(record)
+        assert "user=admin" in record.msg
+        assert "status=ok" in record.msg
+        assert "count=5" in record.msg
+
+    def test_case_insensitive_matching(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("PASSWORD=GEHEIM")
+        f.filter(record)
+        assert "GEHEIM" not in record.msg
+
+    def test_filter_always_returns_true(self):
+        """filter() must always return True so the record is never dropped."""
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        assert f.filter(self._record("any message")) is True
+        assert f.filter(self._record("password=secret")) is True
+
+    def test_tuple_args_are_sanitized(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("value: %s")
+        record.args = ("password=topsecret",)
+        f.filter(record)
+        assert "topsecret" not in record.args[0]
+        assert "password=***" in record.args[0]
+
+    def test_dict_args_are_sanitized(self):
+        from app import SanitizeFilter
+        f = SanitizeFilter()
+        record = self._record("%(info)s")
+        record.args = {"info": "token=abc123"}
+        f.filter(record)
+        assert "abc123" not in record.args["info"]
+
+
+# ---------------------------------------------------------------------------
+# NFR-SEC-006  Session expiry – time-based re-authentication
+# ---------------------------------------------------------------------------
+
+class TestSessionExpiry:
+    """Sessions older than SESSION_LIFETIME_HOURS must be invalidated."""
+
+    def test_fresh_session_allows_access(self, client):
+        client.post("/auth/login", data={"username": "admin", "password": "admin123"})
+        resp = client.get("/admin/")
+        assert resp.status_code == 200
+
+    def test_login_stamps_login_time_in_session(self, client):
+        client.post("/auth/login", data={"username": "admin", "password": "admin123"})
+        with client.session_transaction() as sess:
+            assert "_login_time" in sess
+
+    def test_expired_session_redirects_to_login(self, client):
+        client.post("/auth/login", data={"username": "admin", "password": "admin123"})
+        from datetime import datetime, timezone, timedelta
+        with client.session_transaction() as sess:
+            expired = datetime.now(timezone.utc) - timedelta(hours=9)
+            sess["_login_time"] = expired.isoformat()
+        resp = client.get("/admin/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" in resp.headers.get("Location", "").lower()
+
+    def test_expired_session_shows_flash_message(self, client):
+        client.post("/auth/login", data={"username": "admin", "password": "admin123"})
+        from datetime import datetime, timezone, timedelta
+        with client.session_transaction() as sess:
+            expired = datetime.now(timezone.utc) - timedelta(hours=9)
+            sess["_login_time"] = expired.isoformat()
+        resp = client.get("/admin/", follow_redirects=True)
+        assert "abgelaufen" in resp.data.decode("utf-8").lower()
+
+    def test_missing_login_time_logs_out(self, client):
+        """Session without _login_time (created before this feature) is invalidated."""
+        client.post("/auth/login", data={"username": "admin", "password": "admin123"})
+        with client.session_transaction() as sess:
+            sess.pop("_login_time", None)
+        resp = client.get("/admin/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" in resp.headers.get("Location", "").lower()
+
+    def test_unexpired_session_not_redirected(self, client):
+        client.post("/auth/login", data={"username": "admin", "password": "admin123"})
+        from datetime import datetime, timezone, timedelta
+        with client.session_transaction() as sess:
+            # 7 hours ago – still within the 8-hour window
+            recent = datetime.now(timezone.utc) - timedelta(hours=7)
+            sess["_login_time"] = recent.isoformat()
+        resp = client.get("/admin/")
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# NFR-SEC-004  Global auth gate – before_request middleware
+# ---------------------------------------------------------------------------
+
+class TestGlobalAuthGate:
+    """The require_auth before_request must redirect unauthenticated web users."""
+
+    def test_healthz_accessible_without_auth(self, client):
+        resp = client.get("/healthz")
+        assert resp.status_code == 200
+
+    def test_auth_login_accessible_without_auth(self, client):
+        resp = client.get("/auth/login")
+        assert resp.status_code == 200
+
+    def test_static_not_redirected_to_login(self, client):
+        resp = client.get("/static/css/style.css", follow_redirects=False)
+        # May be 200 or 404 depending on file – must NOT redirect to login
+        assert resp.status_code not in (301, 302)
+
+    def test_disponent_dashboard_requires_auth(self, client):
+        resp = client.get("/disponent/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" in resp.headers.get("Location", "").lower()
+
+    def test_werkstatt_dashboard_requires_auth(self, client):
+        resp = client.get("/werkstatt/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" in resp.headers.get("Location", "").lower()
+
+    def test_api_endpoints_not_affected_by_web_auth_gate(self, client):
+        """/api/ routes use HTTP Basic Auth, not the web session gate."""
+        resp = client.get("/api/v1/devices")
+        # Must return 401 (from HTTP Basic Auth), not 302 (from web gate)
+        assert resp.status_code == 401
+
+    def test_next_param_preserved_on_redirect(self, client):
+        resp = client.get("/admin/devices", follow_redirects=False)
+        location = resp.headers.get("Location", "")
+        assert "next" in location or "login" in location

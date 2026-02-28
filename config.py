@@ -88,6 +88,13 @@ class Config:
     ALLOWED_PHOTO_EXTENSIONS: set = {"jpg", "jpeg", "png", "gif", "webp"}
 
     # ------------------------------------------------------------------ #
+    #  Session security                                                    #
+    # ------------------------------------------------------------------ #
+    # Maximum age of a login session in hours (NFR-SEC-006).
+    # After this time the user must re-authenticate regardless of activity.
+    SESSION_LIFETIME_HOURS: int = int(os.environ.get("SESSION_LIFETIME_HOURS", "8"))
+
+    # ------------------------------------------------------------------ #
     #  Rate limiting (flask-limiter)                                       #
     # ------------------------------------------------------------------ #
     RATELIMIT_ENABLED: bool = True

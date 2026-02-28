@@ -175,7 +175,8 @@ class TestDisponentDashboard:
         body = resp.data.decode()
         assert "Geräte gesamt" in body
         assert "Nicht verfügbar" in body
-        assert "Reserviert" in body
+        # "Reserviert" tile replaced with "Offene Defekte" (Issue #38)
+        assert "Offene Defekte" in body
         assert "Verfügbar heute" in body
 
     def test_dashboard_tile_links_present(self, disponent_client):
@@ -183,7 +184,7 @@ class TestDisponentDashboard:
         body = resp.data.decode()
         assert "/disponent/kachel/alle" in body
         assert "/disponent/kachel/nicht-verfuegbar" in body
-        assert "/disponent/kachel/reserviert" in body
+        # "Reserviert" tile removed from dashboard (Issue #38); filter still exists in tile_detail
         assert "/disponent/kachel/verfuegbar" in body
 
     def test_dashboard_counts_reflect_device_statuses(

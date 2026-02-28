@@ -2,9 +2,10 @@
 Authentication blueprint – /auth/*
 """
 
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from extensions import limiter
@@ -38,6 +39,8 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user, remember=False)
+            # NFR-SEC-006: record login time for time-based session expiry
+            session["_login_time"] = datetime.now(timezone.utc).isoformat()
             next_page = request.args.get("next")
             safe_next = next_page if _is_safe_url(next_page) else None
             return redirect(safe_next or url_for("index"))

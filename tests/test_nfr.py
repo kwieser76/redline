@@ -413,12 +413,14 @@ class TestDatabaseIntegrity:
 class TestErrorHandlers:
     """Error pages must return correct status codes and render the error template."""
 
-    def test_404_returns_correct_status(self, client):
-        resp = client.get("/nonexistent-route-abc-xyz")
+    def test_404_returns_correct_status(self, admin_client):
+        # Must use an authenticated client: unauthenticated requests to unknown
+        # routes are redirected to login (NFR-SEC-004 global auth gate), not 404.
+        resp = admin_client.get("/nonexistent-route-abc-xyz")
         assert resp.status_code == 404
 
-    def test_404_renders_error_template(self, client):
-        resp = client.get("/nonexistent-route-abc-xyz")
+    def test_404_renders_error_template(self, admin_client):
+        resp = admin_client.get("/nonexistent-route-abc-xyz")
         assert b"nicht gefunden" in resp.data.lower() or b"not found" in resp.data.lower()
 
     def test_403_returned_for_non_admin_on_admin_route(self, team_client):

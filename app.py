@@ -5,9 +5,11 @@ Application factory.
 
 import logging
 import os
+import re
+from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, redirect, render_template, url_for
-from flask_login import LoginManager, current_user
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from flask_login import LoginManager, current_user, logout_user
 from flask_mail import Mail
 from sqlalchemy import text
 
@@ -15,6 +17,38 @@ from config import APP_VERSION, Config, config_by_name
 from extensions import limiter, metrics_exporter, migrate
 from metrics import app_info, business_collector, db_up
 from models import DefectCategory, Device, DeviceCategory, EmailRecipient, User, db
+
+# --------------------------------------------------------------------------- #
+#  NFR-SEC-007 – Sanitize sensitive key=value pairs from log output            #
+# --------------------------------------------------------------------------- #
+
+
+class SanitizeFilter(logging.Filter):
+    """Redacts secret values from log records.
+
+    Replaces the value in patterns like ``password=geheim123`` with ``***``
+    so credentials are never written to log files or stdout.
+
+    Patterns matched (case-insensitive): password, passwd, token, secret, key.
+    """
+
+    _PATTERN = re.compile(r"(?i)(password|passwd|token|secret|key)=\S+")
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        record.msg = self._PATTERN.sub(r"\1=***", str(record.msg))
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = {
+                    k: self._PATTERN.sub(r"\1=***", str(v)) if isinstance(v, str) else v
+                    for k, v in record.args.items()
+                }
+            elif isinstance(record.args, tuple):
+                record.args = tuple(
+                    self._PATTERN.sub(r"\1=***", str(a)) if isinstance(a, str) else a
+                    for a in record.args
+                )
+        return True  # always pass the (possibly modified) record
+
 
 # --------------------------------------------------------------------------- #
 #  Logging                                                                      #
@@ -25,6 +59,12 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+
+# Register SanitizeFilter on every root handler so no sensitive value leaks.
+_sanitize_filter = SanitizeFilter()
+for _handler in logging.root.handlers:
+    _handler.addFilter(_sanitize_filter)
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +140,52 @@ def create_app(config_class=None) -> Flask:
                 "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
             )
         return response
+
+    # ---------------------------------------------------------------------- #
+    #  NFR-SEC-006 – Time-based session expiry                                #
+    # ---------------------------------------------------------------------- #
+
+    @app.before_request
+    def check_session_expiry():
+        """Log out users whose session exceeds SESSION_LIFETIME_HOURS."""
+        if not current_user.is_authenticated:
+            return None
+        login_time_str = session.get("_login_time")
+        if login_time_str is None:
+            # No timestamp → session predates this feature or was tampered.
+            logout_user()
+            flash("Session abgelaufen, bitte erneut anmelden.", "warning")
+            return redirect(url_for("auth.login"))
+        try:
+            login_dt = datetime.fromisoformat(login_time_str)
+        except ValueError:
+            logout_user()
+            flash("Session abgelaufen, bitte erneut anmelden.", "warning")
+            return redirect(url_for("auth.login"))
+        max_age = timedelta(hours=app.config.get("SESSION_LIFETIME_HOURS", 8))
+        if datetime.now(timezone.utc) - login_dt > max_age:
+            session.pop("_login_time", None)
+            logout_user()
+            flash("Session abgelaufen, bitte erneut anmelden.", "warning")
+            return redirect(url_for("auth.login"))
+        return None
+
+    # ---------------------------------------------------------------------- #
+    #  NFR-SEC-004 – Global anonymous-access gate (defense-in-depth)          #
+    # ---------------------------------------------------------------------- #
+
+    # Paths that must stay accessible without a Flask-Login session.
+    # API routes (/api/) use HTTP Basic Auth and handle their own 401 responses.
+    _AUTH_EXEMPT = ("/auth/", "/healthz", "/metrics", "/static/", "/api/")
+
+    @app.before_request
+    def require_auth():
+        """Redirect unauthenticated web users to the login page."""
+        if any(request.path.startswith(p) for p in _AUTH_EXEMPT):
+            return None
+        if not current_user.is_authenticated:
+            return redirect(url_for("auth.login", next=request.path))
+        return None
 
     # ---------------------------------------------------------------------- #
     #  Template globals                                                        #
