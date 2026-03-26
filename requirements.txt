@@ -17,7 +17,7 @@ qrcode[pil]==7.4.2
 Pillow==12.1.1
 
 # HTTP client (used by FileMaker integration)
-requests==2.32.4
+requests==2.33.0
 
 # Configuration
 python-dotenv==1.0.1
