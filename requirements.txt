@@ -14,7 +14,7 @@ SQLAlchemy==2.0.31
 
 # QR code generation
 qrcode[pil]==7.4.2
-Pillow==12.1.1
+Pillow==12.2.0
 
 # HTTP client (used by FileMaker integration)
 requests==2.32.4
